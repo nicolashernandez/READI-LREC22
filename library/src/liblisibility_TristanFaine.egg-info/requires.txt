@@ -1,0 +1,6 @@
+pandas
+spacy<4.0.0,>3.0.0
+torch
+transformers
+unidecode
+scipy

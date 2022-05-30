@@ -1,0 +1,42 @@
+Metadata-Version: 2.1
+Name: liblisibility-TristanFaine
+Version: 0.0.7
+Summary: Permet d evaluer la complexite de textes en francais
+Home-page: https://github.com/pypa/sampleproject
+Author: Tristan Faine, Nabil Oulbaz, Nicolas Hernandez
+Author-email: tristan.faine@etu.univ-nantes.fr
+Project-URL: Source_linguistic_analysis, https://colab.research.google.com/drive/1O7YBbukN8uhvY8IYI9zhYCRVrAR8Gnzt?usp=sharing
+Project-URL: Source_file_extraction, https://colab.research.google.com/drive/1jBtcQMyHd9KB5Q1iXgMrSJm-aAd6WYNp?usp=sharing
+Project-URL: Link to in-progress paper, https://www.overleaf.com/project/61fce1b715a0b91e8b221aab
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+Using this documentation to build the library : 
+https://packaging.python.org/en/latest/tutorials/packaging-projects/   
+
+
+BUILD : python3 (or py if on windows) -m build
+DISTRIBUTE :  python3 -m twine upload --repository testpypi dist/* --verbose
+username = __token__
+password = the pypi test api token, ask tristan faine.
+
+Trying it on another pc :
+CREATE VENV : python3 -m venv .
+ACTIVATE VENV : source ./bin/activate or directly ./Scripts/activate if on windows
+
+# Using the repository on test pypi 
+INSTALL LIB : python3 -m pip install --index-url https://test.pypi.org/simple/  --extra-index-url https://pypi.org/simple/ liblisibility-TristanFaine
+UPGRADE LIB : python3 -m pip install --index-url https://test.pypi.org/simple/  --extra-index-url https://pypi.org/simple/ liblisibility-TristanFaine --upgrade
+USE LIB : "from liblisibility import X"
+
+# Using editable install mode (in venv)
+
+pip install --editable $PATH
+
+pip uninstall $LIB-NAME
+
+After modifying the library, it can be reloaded within an interpretor by doing importlib.reload(packagename), or imp.reload(packagename) if below python ver 3.4
