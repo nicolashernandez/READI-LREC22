@@ -1,33 +1,27 @@
-# the utils module contains functions that are used by most of the other classes
-# or things that aren't necessary for the library.
 import pickle
 import os
 
-# Note : remove this when we're done, this is just a quick workaround
+# Pseudo-docstring : The utils module contains common functions that are used by the other classes
+# or things that are useful in order to reproduce the contents of the READI paper.
+
+
+# Note : remove this when we're done, this is just a quick dev workaround
 def test_import(file_path):
     with open("test_data/"+file_path+".pkl","rb") as file:
         return pickle.load(file)
 
 # This returns a dictionary containing the content of each text in a dictionary :
-# corpus[nameoffolder][index]
+# Note : I need to test this on different OS to make sure it works independently.
 def generate_corpus_from_folder(folder_path):
-    #TODO: if no folder_path was specified, return error.
-    corpus = dict()
-    for top, dirs, files in os.walk(folder_path):  
-        globals()[top.split(os.path.sep)[-1]] = list()
-        for file in files:
-            if file.endswith('txt'):
-                with open(os.path.join(top,file),"r") as f:
-                    text = f.read().replace('\n',' ').replace('  \x0c','. ')
-            globals()[top.split(os.path.sep)[-1]].append(text)
-        corpus[top.split(os.path.sep)[-1]] = globals()[top.split(os.path.sep)[-1]]
+    """
+    Creates a dictionary with the same structure as the one used in our READI paper
+        
+    :param folder_path: Dictionary of lists of sentences (represented as a list of tokens)
+    :type folder_path: string
 
-    corpus.pop("textFiles")
-    # This only work if files are structured as follow : root/levelX/files
-    return corpus
-
-# Note : this does the same as the previous function, but should be more generalizable
-def generate_corpus_from_folder_alt(folder_path):
+    :return: A dictionary in our READI corpus format : dict[class][sentence_index][word_index]
+    :rtype: dict
+    """
     corpus = dict()
     for top, dirs, files in os.walk(os.getcwd()):  
         if top.endswith(folder_path):
@@ -40,3 +34,23 @@ def generate_corpus_from_folder_alt(folder_path):
                         globals()[top.split(os.path.sep)[-1]].append(text)
             corpus[top.split(os.path.sep)[-1]] = globals()[top.split(os.path.sep)[-1]]
     return corpus
+
+def compile(text):
+    """
+    Creates a dictionary with the same structure as the one used in our READI paper
+        
+    :param text: Preferably a list of sentences, which are lists of texts, but could be a string.
+    :type text: list(list()) OR str
+
+    :return: A readability object
+    :rtype: readib.readability
+    """
+
+    if type(text) == str:
+        print("Type Sanity Check : do the conversion from string to list of lists for later use")
+
+    print("Calculate a bunch of useful information")
+
+    print("return a readability class object, but with the extra information")
+
+    return 0

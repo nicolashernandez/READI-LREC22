@@ -9,7 +9,7 @@ import string
 
 # Note : I tried adding the spacy model as a dependency in setup.cfg:
 # fr_core_news_sm@https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.3.0/fr_core_news_sm-3.3.0.tar.gz#egg=fr_core_news_sm
-# But I can't figure out how to use it, so this shall have to do as a workaround.
+# But I can't figure out how to use it, so this is a workaround.
 
 try:
     nlp = spacy.load('fr_core_news_sm')
@@ -22,8 +22,12 @@ except OSError:
     nlp = spacy.load('fr_core_news_sm')
     print("DEBUG: Spacy model location : ",nlp._path)
 
+#Pseudo-docstring:
+#The stats module is used by the Readability class in order to output 
 
-def dataset_stats(tokens):
+
+
+def dataset_stats(corpus):
     """
     Output several basic statistics such as number of texts, sentences, or tokens, alongside size of the vocabulary.
         
@@ -35,14 +39,14 @@ def dataset_stats(tokens):
     """
 
     # Extract the classes from the dictionary's keys.
-    levels = list(tokens.keys())
+    levels = list(corpus.keys())
     cols = levels + ['total']
 
     # Build vocabulary
     vocab = dict()
     for level in levels:
         vocab[level] = list()
-        for text in tokens[level]:
+        for text in corpus[level]:
             unique = set()
             for sent in text:
                 #for sent in text['content']:
@@ -59,7 +63,7 @@ def dataset_stats(tokens):
     len_ph_moy = list()
 
     for level in levels:
-        nb_txt = len(tokens[level])
+        nb_txt = len(corpus[level])
         nb_files.append(nb_txt)
         nbr_ph=0
         nbr_ph_moy =0
@@ -67,7 +71,7 @@ def dataset_stats(tokens):
         nbr_tokens_moy =0
         len_phr=0
         len_phr_moy=0
-        for text in tokens[level]:
+        for text in corpus[level]:
             nbr_ph+=len(text)
             temp_nbr_ph = len(text)
             nbr_ph_moy+=len(text)/nb_txt
@@ -134,39 +138,59 @@ def syllablesplit(input):
             if syl == unidecode(char):
                 nb_syllabes+=1
                 break
-    return(nb_syllabes)
-#^ Current syllable splitter used in the notebooks (without the break)
+    return nb_syllabes
+# ^ Current syllable splitter used in the notebooks (without the break)
 
-# Note : need to ask Hernandez if this is a better estimator :
-# this does not increment the number of syllables if they're adjacent to each other
-# So "bonjour" will return 2 syllables, and not 3 unlike the other function.
-def bettersyllablesplit(input):
-    nb_syllabes = 0
-    syllables='aeiouy'
-    prev_is_syl = False
-    for char in input:
-        if prev_is_syl:
-                prev_is_syl = False
-                continue
-        for syl in syllables:
-            if syl == unidecode(char) and not prev_is_syl:
-                nb_syllabes+=1
-                prev_is_syl = True
-                break
-    return(nb_syllabes)
+#The following function provides a better estimator, but is unused as it is not accurate enough.
+
+
+#def bettersyllablesplit(input):
+#    nb_syllabes = 0
+#    syllables='aeiouy'
+#    prev_is_syl = False
+#    for char in input:
+#        if prev_is_syl:
+#                prev_is_syl = False
+#                continue
+#        for syl in syllables:
+#            if syl == unidecode(char) and not prev_is_syl:
+#                nb_syllabes+=1
+#                prev_is_syl = True
+#                break
+#    return(nb_syllabes)
 
 # Text "must" be a list of sentences, which are lists of words.
 def GFI_score(text):
+    """
+    Output the Gunning Ford something index TODO find description online.
+        
+    :param tokens: Dictionary of lists of sentences (represented as a list of tokens)
+    :type tokens: dict[class][text][sentence][token]
+
+    :return: a pandas dataframe 
+    :rtype: pandas.core.frame.DataFrame
+    """
+    #TODO: provide an alternative way to calculate the score depending on format
+    #Oh, this is just the pre-formating thing, wow i really get what he means now.
+    #Type sanity check : Convert string to list.
     if type(text) == str:
-        print("Handle this later, for now text must be a list of sentences, which are lists of words")
-        return 0
+        text = [token.text for token in nlp(text) if (not token.is_punct)]
+        #this... normally shouldn't modify the original text?
+        #wait. does gfi even include punctuation...?
+        #oh god nabil what have we done.
+
+    print(text)
     totalWords = 0
     totalSentences = len(text)
     longWords = 0
     for sent in text:
-      totalWords += len(sent)
-      longWords += len([token for token in sent if len(token)>6])
+        print(type(sent))
+        totalWords += len(sent)
+        longWords += len([token for token in sent if len(token)>6])
     score = 0.4*((totalWords/totalSentences) + 100*longWords/totalSentences)
+    print(totalWords)
+    print(totalSentences)
+    print(longWords)
     return score
 
 def ARI_score(text):
@@ -185,7 +209,7 @@ def FRE_score(text):
     totalSyllables = 0
     for sent in text:
         totalWords += len(sent)
-        totalSyllables += sum(bettersyllablesplit(word) for word in sent)
+        totalSyllables += sum(syllablesplit(word) for word in sent)
     score_FRE = 206.835-1.015*(totalWords/totalSentences)-84.6*(totalSyllables/totalWords)
     return(score_FRE)
 
@@ -195,7 +219,7 @@ def FKGL_score(text):
     totalSyllables = 0
     for sent in text:
         totalWords += len(sent)
-        totalSyllables += sum(bettersyllablesplit(word) for word in sent)
+        totalSyllables += sum(syllablesplit(word) for word in sent)
     score_FKGL = 0.39*(totalWords/totalSentences)+11.8*(totalSyllables/totalWords)-15.59
     return(score_FKGL)
 
@@ -205,7 +229,7 @@ def SMOG_score(text):
     totalSentences = len(text)
     nbPolysyllables = 0
     for sent in text:
-        nbPolysyllables += sum(1 for word in sent if bettersyllablesplit(word)>=3) 
+        nbPolysyllables += sum(1 for word in sent if syllablesplit(word)>=3) 
     score_SMOG = 1.043*math.sqrt(nbPolysyllables*(30/totalSentences))+3.1291
     return(score_SMOG)
 
@@ -215,15 +239,19 @@ def REL_score(text):
     totalSyllables = 0
     for sent in text:
         totalWords += len(sent)
-        totalSyllables += sum(bettersyllablesplit(word) for word in sent)
+        totalSyllables += sum(syllablesplit(word) for word in sent)
     score_REL = 207-1.015*(totalWords/totalSentences)-73.6*(totalSyllables/totalWords)
     return(score_REL)
 # Note :     
-# I should add a check for if text == str or list. (to perform tokenization or not)
+# I should add a check for if type(text) == str or list. (to perform tokenization or not)
 # I suppose that wouldn't be disruptive behaviour.
 
 
 #TODO : reformat this in order to have less clutter..
+#Note : The following 2 functions will have to be redone once we change our project's structure
+#the thing where we have r = readability class
+#and we can do r.compile(text)
+#in order to have a bunch of information already known, which makes life much more easier and optimized.
 def traditional_scores(corpus):
     """
     Outputs a pandas dataframe containing the mean scores for various traditional readability measures.
@@ -412,8 +440,8 @@ def traditional_scores_optimized(corpus):
                 totalWords += len(sent)
                 nbLongWords += len([token for token in sent if len(token)>6])
                 totalCharacters += sum(len(token) for token in sent)
-                totalSyllables += sum(bettersyllablesplit(word) for word in sent)
-                nbPolysyllables += sum(1 for word in sent if bettersyllablesplit(word)>=3) 
+                totalSyllables += sum(syllablesplit(word) for word in sent)
+                nbPolysyllables += sum(1 for word in sent if syllablesplit(word)>=3) 
             GFI[level].append(0.4*((totalWords/totalSentences) + 100*nbLongWords/totalSentences))
             ARI[level].append(4.71*((totalCharacters/totalWords) + 0.5*totalWords/totalSentences)-21.43)
             FRE[level].append(206.835-1.015*(totalWords/totalSentences)-84.6*(totalSyllables/totalWords))
@@ -533,7 +561,7 @@ def traditional_scores_optimized(corpus):
 
     print("time elapsed perf counter:", time.perf_counter() - t0)
     return math_formulas
-#this takes roughly half as less time.
+#this takes roughly half as much time.
 
 ###############################################################################
 
@@ -591,6 +619,8 @@ def noun_token_ratio(text):
 
 class PPPL_calculator:
     def load_model(self):
+        #TODO: This is a 486MB model, we should find a way to keep it locally.
+
         model_name = "asi/gpt-fr-cased-small"
         # Load pre-trained model (weights)
         with torch.no_grad():
@@ -608,12 +638,61 @@ class PPPL_calculator:
         tensor_input = torch.tensor([tokenize_input[:self.max_length]])
         loss=self.model(tensor_input, labels=tensor_input)[0]
         return np.exp(loss.detach().numpy())
-    def PPPL_score(self,text):
-        tex = ''
-        for sent in text:
-            tex +=' '.join(sent)
+    def PPPL_score_text(self,text):
+        if type(text) == list:
+            tex = ''
+            for sent in text:
+                tex +=' '.join(sent)
+                calcul = self.gpt2_pppl_score(tex.strip())
+                return calcul
+        elif type(text) == string:
             calcul = self.gpt2_pppl_score(tex.strip())
-            return(calcul)
+            return calcul
+        else:
+            #return type error
+            print("todo: return type error")
+            return -1
+    #maybe make just one function and change behavior according to type.
+    def PPPL_score(self,corpus,save = False):
+        levels = list(corpus.keys())
+        perplex = dict()
+        nb_tot = 0
+        for level in levels:
+            perplex[level] = []
+            ppl = 0
+            for text in corpus[level]:
+                tex = ''
+                for sent in text:
+                    tex +=' '.join(sent)
+                perplex[level].append(self.gpt2_pppl_score(tex.strip()))
+        return perplex
+
+        #with open('perplex_jll.pkl','wb') as file:
+        #    pickle.dump(perplex,file)
+    def remove_outliers(self,perplex,stddevratio = 1):
+        levels = list(perplex.keys())
+        moy_ppl= list()
+        for level in levels:
+            moy=0
+            for score in perplex[level]:
+                moy+= score/len(perplex[level])
+            moy_ppl.append(moy)
+        outliers_indices = perplex.copy()
+        for index, level in enumerate(levels):
+            outliers_indices[level] = [idx for idx in range(len(perplex[level])) if perplex[level][idx] > moy_ppl[index] + (stddevratio * stddev_ppl[index]) or perplex[level][idx] < moy_ppl[index] - (stddevratio * stddev_ppl[index])]
+            print(outliers_indices[level])
+            print("nb textes enleves(",level,"):", len(outliers_indices[level]))
+        import copy
+        corpus_no_outliers = copy.deepcopy(corpus)
+        for level in levels:
+            offset = 0
+            for index in corpus_no_outliers[level][:]:
+                corpus_no_outliers[level].pop(index - offset)
+                offset += 1
+            print("Number of texts for class", level, ":", len(corpus_no_outliers[level]))
+        return corpus_no_outliers
+
+
 pppl_calculator = PPPL_calculator()
 
 # Todo : put a custom error message so that user remembers to do load_model()

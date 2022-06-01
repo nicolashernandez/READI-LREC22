@@ -8,8 +8,8 @@ username = __token__
 password = the pypi test api token, ask tristan faine.  
 
 ## Trying it on another pc :  
-CREATE VENV : python3 -m venv .  
-ACTIVATE VENV : source ./bin/activate or directly ./Scripts/activate if on windows
+CREATE VENV : python3 -m venv venv  
+ACTIVATE VENV : source venv/bin/activate or directly venv/Scripts/activate if on windows
 
 # Using editable install mode (with venv)
 pip install --editable $PATH  
