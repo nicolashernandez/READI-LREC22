@@ -1,68 +1,235 @@
 """
-The Readability module interacts with the library's modules to provide a bunch of useful functions / reproduce the READI paper's contents
+The Readability module interacts with the library's submodules to provide a bunch of useful functions / reproduce the READI paper's contents
 
-It is meant to provide the following :
+It provides the following services :
 At start-up : it "compiles" a text into a structure useful for the other functions, and also calculates relevant statistics (number of words, sentences, syllables, etc..)
 Enables a way to access "simple" scores by using these pre-calculated statistics
 Perform lazy loading of more complicated things, like calculating perplexity or the use of Machine Learning / Deep Learning models
 """
 
-
 import pandas as pd
-from .stats import *
+import spacy
+import unidecode
+from .stats import diversity, perplexity, common_scores
 from .methods import *
 from .models import *
+
+# Checklist :
+#     Remake structure to help differenciate between functions : ~ I think it's okay but I need some feedback
+#     Enable a way to "compile" in order to use underlying functions faster : ~ Logic is ready, but the code isn't. I most likely need to make a Statistics class and give it a bunch of attributes
+#     Make sure code works both for texts (strings, or pre-tokenized texts) and corpus structure : ~ It's in progress..
+#     Add the methods related to machine learning or deep learning : X
+#     Experiment further : X
+#     Add other measures that could be useful : X
+
+
+
+#TODO : put this elsewhere, it's needed for the compilation but it's not exactly part of the readability object. I'll probably put it in utils.
+def syllablesplit(input):
+    nb_syllabes = 0
+    syllables='aeiouy'
+    for char in input:
+        for syl in syllables:
+            if syl == unidecode(char):
+                nb_syllabes+=1
+                break
+    return nb_syllabes
+
 
 class Readability:
     """
     The Readability class provides a way to access the underlying library modules in order to help estimate the complexity of any given text
     List of methods : __init__, corpus_info, common_scores
-    List of attributes : content, content_type, lang, nlp_processor, perplexity_processor
+    List of attributes : content, content_type, classes, lang, nlp, perplexity_processor, statistics
 
     In its current state, scores are only accurate for the French language, but this can change in the future.
     
     """
-    def __init__(self, content, lang = "fr", nlp_processor = "spacy_sm", perplexity_processor = "gpt2"):
-        print("hello world my first parameter is", lang)
+    def __init__(self, content, lang = "fr", nlp_name = "spacy_sm", perplexity_processor = "gpt2"):
         #V0 will download everything at once when called.
         #V1 could implement lazy loading for the heavy stuff, like using a transformer model.
-        
-        #Handling text that needs to be converted
-        if type(content) == str:
-            print("amogus is a simple string")
-            self.content_type = "text"
-            self.content = content ; print(self.content)
 
-        #Handling text that doesn't need to be converted
-        elif any(isinstance(el, list) for el in content):
-            print("sugoma is a list of lists. probably")
-            self.content_type = "text"
-            self.content = content ; print(self.content)
+        #1) Compile/convert text/corpora into relevant format
 
-        #1) Compile text/corpora into relevant format
-
-
-        #2) Prepare statistics
-
-        #3) Load the "small" or local stuff like spacy"
-
+        #2 + 3) Prepare statistics into a list or object + Load the "small" or local stuff like spacy (via a compile function)
 
         #4) Prepare ways to lazy load heavier stuff
 
-        #Suppose input is a corpus.
+
+        # Handle the NLP processor (mainly for tokenization in case we're given a text as a string)
+        # Note : I tried adding the spacy model as a dependency in setup.cfg:
+        # fr_core_news_sm@https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.3.0/fr_core_news_sm-3.3.0.tar.gz#egg=fr_core_news_sm
+        # But I can't figure out how to use it, so this is a workaround.
+        print("Acquiring Natural Language Processor...")
+        if lang == "fr" and nlp_name == "spacy_sm":
+            try:
+                self.nlp = spacy.load('fr_core_news_sm')
+                print("DEBUG: Spacy model location (already installed) : ",self.nlp._path)
+            except OSError:
+                print('Downloading spacy language model \n'
+                            "(Should happen only once)")
+                from spacy.cli import download
+                download('fr_core_news_sm')
+                self.nlp = spacy.load('fr_core_news_sm')
+                print("DEBUG: Spacy model location : ",self.nlp._path)
+        else:
+            self.nlp = None
+        
+
+        #Handling text that needs to be converted into lists of tokens
+        if isinstance(content, str):
+            print("DEBUG: Text recognized as string, converting to list of lists")
+            self.content_type = "text"
+            self.content = [[token.text for token in sent] for sent in self.nlp(content).sents]
+            nb_words = 0
+            for sentence in self.content:
+                nb_words += len(sentence)
+            print(nb_words)
+            if nb_words < 101:
+                print("WARNING : Text length is less than 100 words, scores will be inaccurate and meaningless.")
+            print("DEBUG : converted content is :", self.content)
+
+            #TODO : kind of forgot what to put here so i'll just do a split later
+
+        #Handling text that doesn't need to be converted
+        elif any(isinstance(el, list) for el in content):
+            print("DEBUG : Text recognized as list of sentences, not converting")
+            self.content_type = "text"
+            self.content = content
+            print("DEBUG: recognized content is :",self.content)
+
+        #Handling text that was only converted into tokens
+        elif isinstance(content, list):
+            print("DEBUG : Text is already tokenized, converting to a list of sentences")
+            self.content_type = "text"
+            content = ' '.join(content)
+            self.content = [[token.text for token in sent] for sent in self.nlp(content).sents]
+            nb_words = 0
+            for sentence in self.content:
+                for token in sentence:
+                    nb_words +=1
+            print(nb_words)
+            if nb_words < 101:
+                print("WARNING : Text length is less than 100 words, scores will be inaccurate and meaningless.")
+            print("DEBUG : converted content is :", self.content)
+
+
+        #Check if input is a corpus.
         else:
             #Reminder, structured needed is : dict => list of texts => list of sentences => list of words
             if type(content) == dict:
                 if isinstance(content[list(content.keys())[0]], list):
                     if isinstance(content[list(content.keys())[0]][0], list):
                         if isinstance(content[list(content.keys())[0]][0][0], list):
-                            print(content[list(content.keys())[0]][0][0])
+                            print("DEBUG : recognized as corpus")
                             self.content_type = "corpus"
                             self.content = content
                             self.classes = list(content.keys())
+        
+
+    #The calculation of common_scores are handled by passing a stats list or object that contains the relevant information.
+    #If these informations are unknown, the method will attempt to extract them from the current text.
+    #TODO : replace these if elif with try catch
+    def gfi(self):
+        if self.content_type == "text":
+            if hasattr(self, "statistics"):
+                print("DEBUG : pre-existing information was found")
+                return common_scores.GFI_score(self.content, self.nlp, self.statistics)
+            else:
+                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                return common_scores.GFI_score(self.content, self.nlp)
+        elif self.content_type == "corpus":
+            print("just do a loop and return a list of scores")
+        return -1
+    def ari(self):
+        if self.content_type == "text":
+            if hasattr(self, "statistics"):
+                print("DEBUG : pre-existing information was found")
+                return common_scores.ARI_score(self.content, self.nlp, self.statistics)
+            else:
+                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                return common_scores.ARI_score(self.content, self.nlp)
+        elif self.content_type == "corpus":
+            print("just do a loop and return a list of scores")
+        return -1
+    def fre(self):
+        if self.content_type == "text":
+            if hasattr(self, "statistics"):
+                print("DEBUG : pre-existing information was found")
+                return common_scores.FRE_score(self.content, self.nlp, self.statistics)
+            else:
+                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                return common_scores.FRE_score(self.content, self.nlp)
+        elif self.content_type == "corpus":
+            print("just do a loop and return a list of scores")
+        return -1
+    def fkgl(self):
+        if self.content_type == "text":
+            if hasattr(self, "statistics"):
+                print("DEBUG : pre-existing information was found")
+                return common_scores.FKGL_score(self.content, self.nlp, self.statistics)
+            else:
+                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                return common_scores.FKGL_score(self.content, self.nlp)
+        elif self.content_type == "corpus":
+            print("just do a loop and return a list of scores")
+        return -1
+    def smog(self):
+        if self.content_type == "text":
+            if hasattr(self, "statistics"):
+                print("DEBUG : pre-existing information was found")
+                return common_scores.SMOG_score(self.content, self.nlp, self.statistics)
+            else:
+                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                return common_scores.SMOG_score(self.content, self.nlp)
+        elif self.content_type == "corpus":
+            print("just do a loop and return a list of scores")
+        return -1
+    def rel(self):
+        if self.content_type == "text":
+            if hasattr(self, "statistics"):
+                print("DEBUG : pre-existing information was found")
+                return common_scores.REL_score(self.content, self.nlp, self.statistics)
+            else:
+                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                return common_scores.REL_score(self.content, self.nlp)
+        elif self.content_type == "corpus":
+            print("just do a loop and return a list of scores")
+        return -1
+    def scores(self):
+        #return an optimized version of the previous scores.
+        #Calling each function implies making an if branch for every text encountered. Profiling is needed to see if this has an impact on performance or not
+        return common_scores.traditional_scores(self.content)
+
+
+    def compile(self):
+        """
+        Calculates a bunch of stuff to make some underlying functions faster.
+        """
+        if self.content_type == "text":
+            totalWords = 0
+            nbLongWords = 0
+            totalSentences = len(self.content)
+            totalCharacters = 0
+            totalSyllables = 0
+            nbPolysyllables = 0
+            for sentence in self.content:
+                totalWords += len(sentence)
+                nbLongWords += len([token for token in sentence if len(token)>6])
+                totalCharacters += sum(len(token) for token in sentence)
+                totalSyllables += sum(syllablesplit(word) for word in sentence)
+                nbPolysyllables += sum(1 for word in sentence if syllablesplit(word)>=3)
+            #TODO : put these in a Statistics class or something, and let that class be used as an attribute for Readability.
+            return 0
+
+        elif self.content_type == "corpus":
+            return 0
+            #Same thing as above, but assign every statistic to a text, somehow.
+        return 0
+
+    #Note : Maybe this should go in the stats subfolder to have less bloat.
     def corpus_info(self):
-        if self.content_type == "corpus":
-            """
+        """
             Output several basic statistics such as number of texts, sentences, or tokens, alongside size of the vocabulary.
                 
             :param corpus: Dictionary of lists of sentences (represented as a list of tokens)
@@ -70,8 +237,12 @@ class Readability:
 
             :return: a pandas dataframe 
             :rtype: pandas.core.frame.DataFrame
-            """
-
+        """
+        #TODO : make that an exception instead?
+        if self.content_type != "corpus":
+            print("Current input isn't recognized as a corpus. Please provide a dictionnary with the following format : dict[class][text][sentence][token]")
+            return 0
+        else:
             # Extract the classes from the dictionary's keys.
             corpus = self.content
             levels = self.classes
@@ -165,6 +336,3 @@ class Readability:
             df = pd.DataFrame([nb_files,nb_ph,nb_ph_moy,len_ph_moy,nb_tokens,nb_tokens_moy,taille_vocab,taille_vocab_moy],columns=cols)
             df.index = ["Nombre de fichiers","Nombre de phrases total","Nombre de phrases moyen","Longueur moyenne de phrase","Nombre de tokens", "Nombre de token moyen","Taille du vocabulaire", "Taille moyenne du vocabulaire"]
             return round(df,0)
-        else:
-            print("current input isn't recognized as a corpus.")
-        return 0
