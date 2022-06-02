@@ -1,11 +1,21 @@
+"""
+temp docstring, i'm going to eat.
+This will probably be divided into several scripts for ease of code/maintaining future versions
+Probably something like :
+scores
+other_scores (text diversity like TTR)
+perplexity
+"""
+
 import math
-import pandas as pd
 import numpy as np
 import spacy
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import torch
 from unidecode import unidecode
 import string
+
+#TODO : seperate into traditional/perplexity for future lazy loading
 
 # Note : I tried adding the spacy model as a dependency in setup.cfg:
 # fr_core_news_sm@https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.3.0/fr_core_news_sm-3.3.0.tar.gz#egg=fr_core_news_sm
@@ -25,110 +35,6 @@ except OSError:
 #Pseudo-docstring:
 #The stats module is used by the Readability class in order to output 
 
-
-
-def dataset_stats(corpus):
-    """
-    Output several basic statistics such as number of texts, sentences, or tokens, alongside size of the vocabulary.
-        
-    :param corpus: Dictionary of lists of sentences (represented as a list of tokens)
-    :type corpus: dict[class][text][sentence][token]
-
-    :return: a pandas dataframe 
-    :rtype: pandas.core.frame.DataFrame
-    """
-
-    # Extract the classes from the dictionary's keys.
-    levels = list(corpus.keys())
-    cols = levels + ['total']
-
-    # Build vocabulary
-    vocab = dict()
-    for level in levels:
-        vocab[level] = list()
-        for text in corpus[level]:
-            unique = set()
-            for sent in text:
-                #for sent in text['content']:
-                for token in sent:
-                    unique.add(token)
-                vocab[level].append(unique)
-    
-    # Number of texts, sentences, and tokens per level, and on the entire corpus
-    nb_ph_moy= list()
-    nb_ph = list()
-    nb_files = list()
-    nb_tokens = list()
-    nb_tokens_moy = list()
-    len_ph_moy = list()
-
-    for level in levels:
-        nb_txt = len(corpus[level])
-        nb_files.append(nb_txt)
-        nbr_ph=0
-        nbr_ph_moy =0
-        nbr_tokens =0
-        nbr_tokens_moy =0
-        len_phr=0
-        len_phr_moy=0
-        for text in corpus[level]:
-            nbr_ph+=len(text)
-            temp_nbr_ph = len(text)
-            nbr_ph_moy+=len(text)/nb_txt
-            for sent in text:
-                nbr_tokens+=len(sent)
-                nbr_tokens_moy+= len(sent)/nb_txt
-                len_phr+=len(sent)
-            len_phr_moy+=len_phr/temp_nbr_ph
-            len_phr=0
-        len_phr_moy = len_phr_moy/nb_txt
-        nb_tokens.append(nbr_tokens)
-        nb_tokens_moy.append(nbr_tokens_moy)
-        nb_ph.append(nbr_ph)
-        nb_ph_moy.append(nbr_ph_moy)
-        len_ph_moy.append(len_phr_moy)
-    nb_files_tot = sum(nb_files)
-    nb_ph_tot = sum(nb_ph)
-    nb_tokens_tot = sum(nb_tokens)
-    nb_tokens_moy_tot = nb_tokens_tot/nb_files_tot
-    nb_ph_moy_tot = nb_ph_tot/nb_files_tot
-    len_ph_moy_tot = sum(len_ph_moy)/len(levels)
-    nb_files.append(nb_files_tot)
-    nb_ph.append(nb_ph_tot)
-    nb_tokens.append(nb_tokens_tot)
-    nb_tokens_moy.append(nb_tokens_moy_tot)
-    nb_ph_moy.append(nb_ph_moy_tot)
-    len_ph_moy.append(len_ph_moy_tot)
-
-    # Vocabulary size per class
-    taille_vocab =list()
-    taille_vocab_moy=list()
-    all_vocab =set()
-    for level in levels:
-        vocab_level = set()
-        for text in vocab[level]:
-            for token in text:
-                all_vocab.add(token)
-                vocab_level.add(token)
-        taille_vocab.append(len(vocab_level))
-
-    taille_vocab.append(len(all_vocab))
-
-    # Mean size of vocabulary
-    taille_vocab_moy = list()
-    taille_moy_total = 0
-    for level in levels:
-        moy=0
-        for text in vocab[level]:
-            taille_moy_total+= len(text)/nb_files_tot
-            moy+=len(text)/len(vocab[level])
-        taille_vocab_moy.append(moy)
-    taille_vocab_moy.append(taille_moy_total)  
-
-    # The resulting dataframe can be used for statistical analysis.
-    df = pd.DataFrame([nb_files,nb_ph,nb_ph_moy,len_ph_moy,nb_tokens,nb_tokens_moy,taille_vocab,taille_vocab_moy],columns=cols)
-    df.index = ["Nombre de fichiers","Nombre de phrases total","Nombre de phrases moyen","Longueur moyenne de phrase","Nombre de tokens", "Nombre de token moyen","Taille du vocabulaire", "Taille moyenne du vocabulaire"]
-    return round(df,0)
 
 def syllablesplit(input):
     nb_syllabes = 0

@@ -1,8 +1,13 @@
+"""
+The utils module contains common functions that are used by the other classes
+or things that are useful in order to reproduce the contents of the READI paper.
+
+It will probably go alongside the library
+"""
 import pickle
 import os
 
-# Pseudo-docstring : The utils module contains common functions that are used by the other classes
-# or things that are useful in order to reproduce the contents of the READI paper.
+
 
 
 # Note : remove this when we're done, this is just a quick dev workaround
