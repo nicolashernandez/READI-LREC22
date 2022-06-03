@@ -1,4 +1,5 @@
-"""The common_scores module contains functions allowing to calculate GFI, ARI, FRE, FKGL, SMOG, and REL.
+"""
+The common_scores module contains functions allowing to calculate GFI, ARI, FRE, FKGL, SMOG, and REL.
 Can be improved by changing formulas/calculations depending on language.
 """
 import math

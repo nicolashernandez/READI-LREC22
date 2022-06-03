@@ -16,7 +16,8 @@ from .models import *
 
 # Checklist :
 #     Remake structure to help differenciate between functions : ~ I think it's okay but I need some feedback
-#     Enable a way to "compile" in order to use underlying functions faster : ~ Logic is ready, but the code isn't. I most likely need to make a Statistics class and give it a bunch of attributes
+#     Enable a way to "compile" in order to use underlying functions faster : ~ Logic is ready, but the code isn't. 
+#     I most likely need to make a Statistics class and give it a bunch of attributes
 #     Make sure code works both for texts (strings, or pre-tokenized texts) and corpus structure : ~ It's in progress..
 #     Add the methods related to machine learning or deep learning : X
 #     Experiment further : X
@@ -24,8 +25,17 @@ from .models import *
 
 
 
-#TODO : put this elsewhere, it's needed for the compilation but it's not exactly part of the readability object. I'll probably put it in utils.
+#TODO : put this elsewhere, it's needed for making text statistics but it's not exactly part of the readability object.
 def syllablesplit(input):
+    """
+    syllablesplit takes as input a word, and estimates the number of syllables in that word
+    Updated version of this function can be improved by taking into account the lang attribute from Readability class.
+    :param input: Content of a word
+    :type input: str
+
+    :return: The estimated number of syllables in a word.
+    :rtype: int
+    """
     nb_syllabes = 0
     syllables='aeiouy'
     for char in input:
@@ -39,13 +49,30 @@ def syllablesplit(input):
 class Readability:
     """
     The Readability class provides a way to access the underlying library modules in order to help estimate the complexity of any given text
-    List of methods : __init__, corpus_info, common_scores
+    List of methods : __init__, corpus_info, .common_scores, scores
     List of attributes : content, content_type, classes, lang, nlp, perplexity_processor, statistics
 
     In its current state, scores are only accurate for the French language, but this can change in the future.
-    
     """
     def __init__(self, content, lang = "fr", nlp_name = "spacy_sm", perplexity_processor = "gpt2"):
+        """
+        Constructor of the Readability class, won't return any value but creates the attributes :
+        self.content, self.content_type, self.nlp, self.lang
+
+        :param content: Content of a text, or a corpus
+        :type content: str, list(str), list(list(str)), converted into list(list(str)) or dict[class][text][sentence][token]
+
+        :param lang: Language the text was written in, in order to adapt some scores.
+        :type lang: str
+
+        :param nlp_name: Type of NLP processor to use, indicated by a "type_subtype" string.
+        :type nlp_name: str
+
+        :param perplexity_processor: Type of processor to use for the calculation of pseudo-perplexity
+        :type perplexity_processor: str
+
+
+        """
         #V0 will download everything at once when called.
         #V1 could implement lazy loading for the heavy stuff, like using a transformer model.
 
@@ -54,6 +81,8 @@ class Readability:
         #2 + 3) Prepare statistics into a list or object + Load the "small" or local stuff like spacy (via a compile function)
 
         #4) Prepare ways to lazy load heavier stuff
+        self.lang = lang
+        self.perplexity_processor = perplexity_processor
 
 
         # Handle the NLP processor (mainly for tokenization in case we're given a text as a string)
@@ -84,12 +113,9 @@ class Readability:
             nb_words = 0
             for sentence in self.content:
                 nb_words += len(sentence)
-            print(nb_words)
             if nb_words < 101:
-                print("WARNING : Text length is less than 100 words, scores will be inaccurate and meaningless.")
+                print("WARNING : Text length is less than 100 words, some scores will be inaccurate.")
             print("DEBUG : converted content is :", self.content)
-
-            #TODO : kind of forgot what to put here so i'll just do a split later
 
         #Handling text that doesn't need to be converted
         elif any(isinstance(el, list) for el in content):
@@ -107,8 +133,7 @@ class Readability:
             nb_words = 0
             for sentence in self.content:
                 for token in sentence:
-                    nb_words +=1
-            print(nb_words)
+                    nb_words += len(sentence)
             if nb_words < 101:
                 print("WARNING : Text length is less than 100 words, scores will be inaccurate and meaningless.")
             print("DEBUG : converted content is :", self.content)
@@ -116,7 +141,8 @@ class Readability:
 
         #Check if input is a corpus.
         else:
-            #Reminder, structured needed is : dict => list of texts => list of sentences => list of words
+            #Reminder, structure needed is : dict => list of texts => list of sentences => list of words
+            #TODO : check this with a bunch of edge cases
             if type(content) == dict:
                 if isinstance(content[list(content.keys())[0]], list):
                     if isinstance(content[list(content.keys())[0]][0], list):
@@ -128,7 +154,7 @@ class Readability:
         
 
     #The calculation of common_scores are handled by passing a stats list or object that contains the relevant information.
-    #If these informations are unknown, the method will attempt to extract them from the current text.
+    #If this informations is unknown, the method will attempt to extract them from the current text.
     #TODO : replace these if elif with try catch
     def gfi(self):
         if self.content_type == "text":
@@ -147,7 +173,7 @@ class Readability:
                 print("DEBUG : pre-existing information was found")
                 return common_scores.ARI_score(self.content, self.nlp, self.statistics)
             else:
-                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                print("DEBUG : pre-existing information was not found, so ARI SHOULD determine it by itself")
                 return common_scores.ARI_score(self.content, self.nlp)
         elif self.content_type == "corpus":
             print("just do a loop and return a list of scores")
@@ -158,7 +184,7 @@ class Readability:
                 print("DEBUG : pre-existing information was found")
                 return common_scores.FRE_score(self.content, self.nlp, self.statistics)
             else:
-                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                print("DEBUG : pre-existing information was not found, so FRE SHOULD determine it by itself")
                 return common_scores.FRE_score(self.content, self.nlp)
         elif self.content_type == "corpus":
             print("just do a loop and return a list of scores")
@@ -169,7 +195,7 @@ class Readability:
                 print("DEBUG : pre-existing information was found")
                 return common_scores.FKGL_score(self.content, self.nlp, self.statistics)
             else:
-                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                print("DEBUG : pre-existing information was not found, so FKGL SHOULD determine it by itself")
                 return common_scores.FKGL_score(self.content, self.nlp)
         elif self.content_type == "corpus":
             print("just do a loop and return a list of scores")
@@ -180,7 +206,7 @@ class Readability:
                 print("DEBUG : pre-existing information was found")
                 return common_scores.SMOG_score(self.content, self.nlp, self.statistics)
             else:
-                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                print("DEBUG : pre-existing information was not found, so SMOG SHOULD determine it by itself")
                 return common_scores.SMOG_score(self.content, self.nlp)
         elif self.content_type == "corpus":
             print("just do a loop and return a list of scores")
@@ -191,7 +217,7 @@ class Readability:
                 print("DEBUG : pre-existing information was found")
                 return common_scores.REL_score(self.content, self.nlp, self.statistics)
             else:
-                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                print("DEBUG : pre-existing information was not found, so REL SHOULD determine it by itself")
                 return common_scores.REL_score(self.content, self.nlp)
         elif self.content_type == "corpus":
             print("just do a loop and return a list of scores")
@@ -199,6 +225,7 @@ class Readability:
     def scores(self):
         #return an optimized version of the previous scores.
         #Calling each function implies making an if branch for every text encountered. Profiling is needed to see if this has an impact on performance or not
+        #TODO : improve further by giving the self.corpus_statistics once we figure out how to make it.
         return common_scores.traditional_scores(self.content)
 
 
@@ -225,6 +252,7 @@ class Readability:
         elif self.content_type == "corpus":
             return 0
             #Same thing as above, but assign every statistic to a text, somehow.
+            #I suppose we could make a self.corpus_statistics attribute with shape : dict[class][statistics]
         return 0
 
     #Note : Maybe this should go in the stats subfolder to have less bloat.
