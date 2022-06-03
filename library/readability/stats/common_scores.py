@@ -3,37 +3,9 @@ The common_scores module contains functions allowing to calculate GFI, ARI, FRE,
 Can be improved by changing formulas/calculations depending on language.
 """
 import math
-
 from unidecode import unidecode
 import pandas as pd
-
-#Note : might need to put syllablesplit as an attribute of the readability class in order to avoid duplicate code.
-def syllablesplit(input):
-    nb_syllabes = 0
-    syllables='aeiouy'
-    for char in input:
-        for syl in syllables:
-            if syl == unidecode(char):
-                nb_syllabes+=1
-                break
-    return nb_syllabes
-# ^ Current syllable splitter used in the notebooks (without the break)
-
-#The following function provides a better estimator, but is unused as it is not accurate enough.
-#def bettersyllablesplit(input):
-#    nb_syllabes = 0
-#    syllables='aeiouy'
-#    prev_is_syl = False
-#    for char in input:
-#        if prev_is_syl:
-#                prev_is_syl = False
-#                continue
-#        for syl in syllables:
-#            if syl == unidecode(char) and not prev_is_syl:
-#                nb_syllabes+=1
-#                prev_is_syl = True
-#                break
-#    return(nb_syllabes)
+from .. import utils
 
 
 # Text "must" be a list of sentences, which are lists of words.
@@ -48,24 +20,27 @@ def GFI_score(text, statistics=None):
     :return: The Gunning fog index of the current text
     :rtype: float
     """
+    #NOTE : this score is wrong since we divided by totalSentences instead of totalWords for the second ratio. Leaving as-is for now.
     if statistics is not None:
-        return 0.4*((statistics.totalWords/statistics.totalSentences) + 100*statistics.longWords/statistics.totalSentences)
+        return 0.4*((statistics.totalWords/statistics.totalSentences) + 100*statistics.totalLongWords/statistics.totalSentences)
     totalWords = 0
     totalSentences = len(text)
-    longWords = 0
+    totalLongWords = 0
     for sent in text:
         totalWords += len(sent)
-        longWords += len([token for token in sent if len(token)>6])
+        totalLongWords += len([token for token in sent if len(token)>6])
     if totalWords < 101:
         print("WARNING : Number of words is less than 100, This score is inaccurate")
-    #NOTE : score is really innacurate regardless, since we divided by totalSentences instead of totalWords for the second ratio.
-    score = 0.4*((totalWords/totalSentences) + 100*longWords/totalSentences)
-    print(totalWords)
-    print(totalSentences)
-    print(longWords)
+    
+    score = 0.4*((totalWords/totalSentences) + 100*totalLongWords/totalSentences)
+    #print(totalWords)
+    #print(totalSentences)
+    #print(totalLongWords)
     return score
 
-def ARI_score(text):
+def ARI_score(text, statistics=None):
+    if statistics is not None:
+        return 4.71*((statistics.totalCharacters/statistics.totalWords) + 0.5*statistics.totalWords/statistics.totalSentences)-21.43
     totalWords = 0
     totalSentences = len(text)
     totalCharacters = 0
@@ -75,49 +50,56 @@ def ARI_score(text):
     score = 4.71*((totalCharacters/totalWords) + 0.5*totalWords/totalSentences)-21.43
     return score
 
-def FRE_score(text):
+def FRE_score(text, statistics=None):
+    if statistics is not None:
+        return 206.835-1.015*(statistics.totalWords/statistics.totalSentences)-84.6*(statistics.totalSyllables/statistics.totalWords)
     totalWords = 0
     totalSentences = len(text)
     totalSyllables = 0
     for sent in text:
         totalWords += len(sent)
-        totalSyllables += sum(syllablesplit(word) for word in sent)
+        totalSyllables += sum(utils.syllablesplit(word) for word in sent)
     score_FRE = 206.835-1.015*(totalWords/totalSentences)-84.6*(totalSyllables/totalWords)
     return(score_FRE)
 
-def FKGL_score(text):
+def FKGL_score(text, statistics=None):
+    if statistics is not None:
+        return 0.39*(statistics.totalWords/statistics.totalSentences)+11.8*(statistics.totalSyllables/statistics.totalWords)-15.59
     totalWords = 0
     totalSentences = len(text)
     totalSyllables = 0
     for sent in text:
         totalWords += len(sent)
-        totalSyllables += sum(syllablesplit(word) for word in sent)
+        totalSyllables += sum(utils.syllablesplit(word) for word in sent)
     score_FKGL = 0.39*(totalWords/totalSentences)+11.8*(totalSyllables/totalWords)-15.59
     return(score_FKGL)
 
-# Note : need to tell Mr Hernandez that polysyllables erroneously returned
-# their own number of syllables instead of just 1.
-def SMOG_score(text):
+# Note : the nbPolysyllables previously erroneously returned their own number of syllables instead of incrementing the counter by one.
+def SMOG_score(text, statistics=None):
+    if statistics is not None:
+        return 1.043*math.sqrt(statistics.nbPolysyllables*(30/statistics.totalSentences))+3.1291
     totalSentences = len(text)
     nbPolysyllables = 0
     for sent in text:
-        nbPolysyllables += sum(1 for word in sent if syllablesplit(word)>=3) 
+        nbPolysyllables += sum(1 for word in sent if utils.syllablesplit(word)>=3) 
     score_SMOG = 1.043*math.sqrt(nbPolysyllables*(30/totalSentences))+3.1291
     return(score_SMOG)
 
-def REL_score(text):
+def REL_score(text, statistics=None):
+    if statistics is not None:
+        return 207-1.015*(statistics.totalWords/statistics.totalSentences)-73.6*(statistics.totalSyllables/statistics.totalWords)
     totalWords = 0
     totalSentences = len(text)
     totalSyllables = 0
     for sent in text:
         totalWords += len(sent)
-        totalSyllables += sum(syllablesplit(word) for word in sent)
+        totalSyllables += sum(utils.syllablesplit(word) for word in sent)
     score_REL = 207-1.015*(totalWords/totalSentences)-73.6*(totalSyllables/totalWords)
     return(score_REL)
 
 
 #TODO : When given self.statistics (or something equivalent since it's a corpus), bypass some calculations to optimize a bit further.
-def traditional_scores(corpus):
+def traditional_scores(corpus, statistics=None):
     """
     Outputs a pandas dataframe containing the mean scores for various traditional readability measures.
     :param corpus: Dictionary of lists of sentences (represented as a list of tokens)
@@ -146,18 +128,18 @@ def traditional_scores(corpus):
         REL[level] = []
         for text in corpus[level]:
             totalWords = 0
-            nbLongWords = 0
+            totalLongWords = 0
             totalSentences = len(text)
             totalCharacters = 0
             totalSyllables = 0
             nbPolysyllables = 0
             for sent in text:
                 totalWords += len(sent)
-                nbLongWords += len([token for token in sent if len(token)>6])
+                totalLongWords += len([token for token in sent if len(token)>6])
                 totalCharacters += sum(len(token) for token in sent)
-                totalSyllables += sum(syllablesplit(word) for word in sent)
-                nbPolysyllables += sum(1 for word in sent if syllablesplit(word)>=3) 
-            GFI[level].append(0.4*((totalWords/totalSentences) + 100*nbLongWords/totalSentences))
+                totalSyllables += sum(utils.syllablesplit(word) for word in sent)
+                nbPolysyllables += sum(1 for word in sent if utils.syllablesplit(word)>=3) 
+            GFI[level].append(0.4*((totalWords/totalSentences) + 100*totalLongWords/totalSentences))
             ARI[level].append(4.71*((totalCharacters/totalWords) + 0.5*totalWords/totalSentences)-21.43)
             FRE[level].append(206.835-1.015*(totalWords/totalSentences)-84.6*(totalSyllables/totalWords))
             FKGL[level].append(0.39*(totalWords/totalSentences)+11.8*(totalSyllables/totalWords)-15.59)
@@ -271,14 +253,14 @@ def traditional_scores(corpus):
 
     math_formulas.index = ["The Gunning fog index GFI", "The Automated readability index ARI","The Flesch reading ease FRE","The Flesch-Kincaid grade level FKGL","The Simple Measure of Gobbledygook SMOG","Reading Ease Level"]
     math_formulas['Pearson Score'] = pearson
+    math_formulas.columns.name = "Mean values"
     print(math_formulas)
     
     math_formulas_stddev = pd.DataFrame([stddev_GFI,stddev_ARI,stddev_FRE,stddev_FKGL,stddev_SMOG,stddev_REL],columns=levels)
     math_formulas_stddev.index = ["The Gunning fog index GFI", "The Automated readability index ARI","The Flesch reading ease FRE","The Flesch-Kincaid grade level FKGL","The Simple Measure of Gobbledygook SMOG","Reading Ease Level"]
-    math_formulas_stddev.columns.name = "Std Dev"
+    math_formulas_stddev.columns.name = "Standard Deviation values"
     print(math_formulas_stddev)
 
 
     print("time elapsed perf counter:", time.perf_counter() - t0)
     return math_formulas
-#this takes roughly half as much time.

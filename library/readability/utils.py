@@ -1,13 +1,10 @@
 """
 The utils module contains common functions that are used by the other classes
 or things that are useful in order to reproduce the contents of the READI paper.
-
-It will probably go alongside the library
 """
 import pickle
 import os
-
-
+from unidecode import unidecode
 
 
 # Note : remove this when we're done, this is just a quick dev workaround
@@ -17,6 +14,8 @@ def test_import(file_path):
 
 # This returns a dictionary containing the content of each text in a dictionary :
 # Note : I need to test this on different OS to make sure it works independently.
+# If I remember correctly, it produces the following : dict[class][text]
+# So we need to continue developping this. 
 def generate_corpus_from_folder(folder_path):
     """
     Creates a dictionary with the same structure as the one used in our READI paper
@@ -40,22 +39,29 @@ def generate_corpus_from_folder(folder_path):
             corpus[top.split(os.path.sep)[-1]] = globals()[top.split(os.path.sep)[-1]]
     return corpus
 
-def compile(text):
-    """
-    Creates a dictionary with the same structure as the one used in our READI paper
-        
-    :param text: Preferably a list of sentences, which are lists of texts, but could be a string.
-    :type text: list(list()) OR str
+def syllablesplit(input):
+    nb_syllabes = 0
+    syllables='aeiouy'
+    for char in input:
+        for syl in syllables:
+            if syl == unidecode(char):
+                nb_syllabes+=1
+                break
+    return nb_syllabes
+# ^ Current syllable splitter used in the notebooks (without the break)
 
-    :return: A readability object
-    :rtype: readib.readability
-    """
-
-    if type(text) == str:
-        print("Type Sanity Check : do the conversion from string to list of lists for later use")
-
-    print("Calculate a bunch of useful information")
-
-    print("return a readability class object, but with the extra information")
-
-    return 0
+#The following function provides a better estimator, but is unused as it is not accurate enough.
+#def bettersyllablesplit(input):
+#    nb_syllabes = 0
+#    syllables='aeiouy'
+#    prev_is_syl = False
+#    for char in input:
+#        if prev_is_syl:
+#                prev_is_syl = False
+#                continue
+#        for syl in syllables:
+#            if syl == unidecode(char) and not prev_is_syl:
+#                nb_syllabes+=1
+#                prev_is_syl = True
+#                break
+#    return(nb_syllabes)

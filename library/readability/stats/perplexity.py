@@ -1,6 +1,4 @@
-"""The perplexity module contains functions 
-
-"""
+"""The perplexity module contains functions in order to calculate pseudo-perplexity"""
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import torch
 import numpy as np

@@ -2,49 +2,35 @@
 The Readability module interacts with the library's submodules to provide a bunch of useful functions / reproduce the READI paper's contents
 
 It provides the following services :
-At start-up : it "compiles" a text into a structure useful for the other functions, and also calculates relevant statistics (number of words, sentences, syllables, etc..)
-Enables a way to access "simple" scores by using these pre-calculated statistics
+At start-up : it "converts" a text into a structure useful for the other functions, and can also calculate relevant statistics via the .compile function (number of words, sentences, syllables, etc..)
+Enables a way to access "simple" scores using these statistics
 Perform lazy loading of more complicated things, like calculating perplexity or the use of Machine Learning / Deep Learning models
+It can be customized based on which NLP processor to use, or what language to evaluate.
 """
-
 import pandas as pd
 import spacy
-import unidecode
+import utils
 from .stats import diversity, perplexity, common_scores
 from .methods import *
 from .models import *
 
 # Checklist :
 #     Remake structure to help differenciate between functions : ~ I think it's okay but I need some feedback
-#     Enable a way to "compile" in order to use underlying functions faster : ~ Logic is ready, but the code isn't. 
-#     I most likely need to make a Statistics class and give it a bunch of attributes
-#     Make sure code works both for texts (strings, or pre-tokenized texts) and corpus structure : ~ It's in progress..
+#     Enable a way to "compile" in order to use underlying functions faster : ~ It's done, need to implement tests.
+#     Make sure code works both for texts (strings, or pre-tokenized texts) and corpus structure : ~ I think it works now.
 #     Add the methods related to machine learning or deep learning : X
 #     Experiment further : X
 #     Add other measures that could be useful : X
 
+# Last task before leaving :
+#   I was using checking if Readability.score() worked, like gfi() calls score(name=gfi), less bloat.
+#   Also wanted to make a version of scores() for texts(not corpus), and an optimized version if we already know the stats
+#   Shouldn't be too hard to implement since the first point *SHOULD* work, the second point can be done by simply calling every score
+#   I don't know how long it'll take for the second point though.
 
-
-#TODO : put this elsewhere, it's needed for making text statistics but it's not exactly part of the readability object.
-def syllablesplit(input):
-    """
-    syllablesplit takes as input a word, and estimates the number of syllables in that word
-    Updated version of this function can be improved by taking into account the lang attribute from Readability class.
-    :param input: Content of a word
-    :type input: str
-
-    :return: The estimated number of syllables in a word.
-    :rtype: int
-    """
-    nb_syllabes = 0
-    syllables='aeiouy'
-    for char in input:
-        for syl in syllables:
-            if syl == unidecode(char):
-                nb_syllabes+=1
-                break
-    return nb_syllabes
-
+# NOTE: This is a bad way to make the "statistics" attribute of Readability, an instance of an object.
+class Statistics:
+    pass
 
 class Readability:
     """
@@ -57,7 +43,7 @@ class Readability:
     def __init__(self, content, lang = "fr", nlp_name = "spacy_sm", perplexity_processor = "gpt2"):
         """
         Constructor of the Readability class, won't return any value but creates the attributes :
-        self.content, self.content_type, self.nlp, self.lang
+        self.content, self.content_type, self.nlp, self.lang, and self.classes only if input is a corpus.
 
         :param content: Content of a text, or a corpus
         :type content: str, list(str), list(list(str)), converted into list(list(str)) or dict[class][text][sentence][token]
@@ -70,17 +56,8 @@ class Readability:
 
         :param perplexity_processor: Type of processor to use for the calculation of pseudo-perplexity
         :type perplexity_processor: str
-
-
         """
-        #V0 will download everything at once when called.
-        #V1 could implement lazy loading for the heavy stuff, like using a transformer model.
-
-        #1) Compile/convert text/corpora into relevant format
-
-        #2 + 3) Prepare statistics into a list or object + Load the "small" or local stuff like spacy (via a compile function)
-
-        #4) Prepare ways to lazy load heavier stuff
+        print("DEBUG : Current parameters of Readability class : lang=",lang, "nlp_name=",nlp_name,"ppl_processor=",perplexity_processor)
         self.lang = lang
         self.perplexity_processor = perplexity_processor
 
@@ -104,7 +81,6 @@ class Readability:
         else:
             self.nlp = None
         
-
         #Handling text that needs to be converted into lists of tokens
         if isinstance(content, str):
             print("DEBUG: Text recognized as string, converting to list of lists")
@@ -151,30 +127,102 @@ class Readability:
                             self.content_type = "corpus"
                             self.content = content
                             self.classes = list(content.keys())
+
+    def score(self, name):
+        """
+        This function calls the relevant score from the submodule common_scores, based on the information possessed by the current instance
+        First, it determines whether we're dealing with a text or a corpus via the use of self.content_type
+        Then, it checks whether the current text was compiled by checking if self.statistics or self.corpus_statistics exists.
+        It then calls the score for a text, or returns a dictionary containing lists of scores in the same format as a corpus (dict{class[score]})
+
+        :param name: Content of a text, or a corpus
+        :type name: str, list(str), list(list(str)), converted into list(list(str)) or dict[class][text][sentence][token]
+        """
+        if name == "gfi":
+            func = common_scores.GFI_score
+        elif name == "ari":
+            func = common_scores.ARI_score
+        elif name == "fre":
+            func = common_scores.FRE_score
+        elif name == "fkgl":
+            func = common_scores.FKGL_score
+        elif name == "smog":
+            func = common_scores.SMOG_score
+        elif name == "rel":
+            func = common_scores.REL_score
+
+        if self.content_type == "text":
+            if hasattr(self, "statistics"):
+                print("DEBUG : pre-existing information was found")
+                return func(self.content, self.statistics)
+            else:
+                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                return func(self.content)
+        elif self.content_type == "corpus":
+            scores = {}
+            for level in self.classes:
+                scores[level] = []
+                #for text in self.content[level]:
+                if hasattr(self, "corpus_statistics"):
+                    print("DEBUG : pre-existing information was found for a corpus")
+                    for statistics in self.corpus_statistics[level]:
+                        #if we go beyond 10 texts, stop printing the score.
+                        #add the score to a dict : list like level1 : text0= 61.523 (should be smth else but yknow, wrong formula and all)
+                        scores[level].append(func(None, statistics))
+                        #stats[level].append(statistics)
+                else:
+                    print("DEBUG : pre-existing information was not found for a corpus")
+                    for text in self.content[level]:
+                        scores[level].append(func(text))
+            #output part of the scores, first 10 texts' score for each class :
+            for level in self.classes:
+                for index,score in enumerate(scores[level][:10]):
+                    print("class", level, "text", index, "score" ,score)
+            return scores
+        else:
+            return -1
         
 
-    #The calculation of common_scores are handled by passing a stats list or object that contains the relevant information.
-    #If this informations is unknown, the method will attempt to extract them from the current text.
-    #TODO : replace these if elif with try catch
+
     def gfi(self):
         if self.content_type == "text":
             if hasattr(self, "statistics"):
                 print("DEBUG : pre-existing information was found")
-                return common_scores.GFI_score(self.content, self.nlp, self.statistics)
+                return common_scores.GFI_score(self.content, self.statistics)
             else:
                 print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
-                return common_scores.GFI_score(self.content, self.nlp)
+                return common_scores.GFI_score(self.content)
         elif self.content_type == "corpus":
-            print("just do a loop and return a list of scores")
-        return -1
+            scores = {}
+            for level in self.classes:
+                scores[level] = []
+                #for text in self.content[level]:
+                if hasattr(self, "corpus_statistics"):
+                    print("DEBUG : pre-existing information was found for a corpus")
+                    for statistics in self.corpus_statistics[level]:
+                        #if we go beyond 10 texts, stop printing the score.
+                        #add the score to a dict : list like level1 : text0= 61.523 (should be smth else but yknow, wrong formula and all)
+                        scores[level].append(common_scores.GFI_score(None, statistics))
+                        #stats[level].append(statistics)
+                else:
+                    print("DEBUG : pre-existing information was not found for a corpus")
+                    for text in self.content[level]:
+                        scores[level].append(common_scores.GFI_score(text))
+            #output part of the scores, first 10 texts' score for each class :
+            for level in self.classes:
+                for index,score in enumerate(scores[level][:10]):
+                    print("class", level, "text", index, "score" ,score)
+            return scores
+        else:
+            return -1
     def ari(self):
         if self.content_type == "text":
             if hasattr(self, "statistics"):
                 print("DEBUG : pre-existing information was found")
-                return common_scores.ARI_score(self.content, self.nlp, self.statistics)
+                return common_scores.ARI_score(self.content, self.statistics)
             else:
                 print("DEBUG : pre-existing information was not found, so ARI SHOULD determine it by itself")
-                return common_scores.ARI_score(self.content, self.nlp)
+                return common_scores.ARI_score(self.content)
         elif self.content_type == "corpus":
             print("just do a loop and return a list of scores")
         return -1
@@ -182,10 +230,10 @@ class Readability:
         if self.content_type == "text":
             if hasattr(self, "statistics"):
                 print("DEBUG : pre-existing information was found")
-                return common_scores.FRE_score(self.content, self.nlp, self.statistics)
+                return common_scores.FRE_score(self.content, self.statistics)
             else:
                 print("DEBUG : pre-existing information was not found, so FRE SHOULD determine it by itself")
-                return common_scores.FRE_score(self.content, self.nlp)
+                return common_scores.FRE_score(self.content)
         elif self.content_type == "corpus":
             print("just do a loop and return a list of scores")
         return -1
@@ -193,10 +241,10 @@ class Readability:
         if self.content_type == "text":
             if hasattr(self, "statistics"):
                 print("DEBUG : pre-existing information was found")
-                return common_scores.FKGL_score(self.content, self.nlp, self.statistics)
+                return common_scores.FKGL_score(self.content, self.statistics)
             else:
                 print("DEBUG : pre-existing information was not found, so FKGL SHOULD determine it by itself")
-                return common_scores.FKGL_score(self.content, self.nlp)
+                return common_scores.FKGL_score(self.content)
         elif self.content_type == "corpus":
             print("just do a loop and return a list of scores")
         return -1
@@ -204,10 +252,10 @@ class Readability:
         if self.content_type == "text":
             if hasattr(self, "statistics"):
                 print("DEBUG : pre-existing information was found")
-                return common_scores.SMOG_score(self.content, self.nlp, self.statistics)
+                return common_scores.SMOG_score(self.content, self.statistics)
             else:
                 print("DEBUG : pre-existing information was not found, so SMOG SHOULD determine it by itself")
-                return common_scores.SMOG_score(self.content, self.nlp)
+                return common_scores.SMOG_score(self.content)
         elif self.content_type == "corpus":
             print("just do a loop and return a list of scores")
         return -1
@@ -215,60 +263,126 @@ class Readability:
         if self.content_type == "text":
             if hasattr(self, "statistics"):
                 print("DEBUG : pre-existing information was found")
-                return common_scores.REL_score(self.content, self.nlp, self.statistics)
+                return common_scores.REL_score(self.content, self.statistics)
             else:
                 print("DEBUG : pre-existing information was not found, so REL SHOULD determine it by itself")
-                return common_scores.REL_score(self.content, self.nlp)
+                return common_scores.REL_score(self.content)
         elif self.content_type == "corpus":
             print("just do a loop and return a list of scores")
         return -1
     def scores(self):
+        """
+        Returns common readability scores
+
+        :return: a pandas dataframe 
+        :rtype: pandas.core.frame.DataFrame 
+        """
         #return an optimized version of the previous scores.
         #Calling each function implies making an if branch for every text encountered. Profiling is needed to see if this has an impact on performance or not
         #TODO : improve further by giving the self.corpus_statistics once we figure out how to make it.
-        return common_scores.traditional_scores(self.content)
+        if self.content_type == "corpus":
+            return common_scores.traditional_scores(self.content)
+        elif self.content_type == "text":
+            #TODO : call each score and put that in a list.
+            print("todo : make list of scores")
+            return -1
 
 
     def compile(self):
         """
-        Calculates a bunch of stuff to make some underlying functions faster.
+        Calculates a bunch of statistics to make some underlying functions faster.
+        Simply do X = X.compile()
+        This returns a copy a Readability instance, supplemented with a "statistics" or "corpus_statistics" attribute that can be used for other functions.
         """
+        #TODO : debloat this and/or refactor it since we copy-paste almost the same below
         if self.content_type == "text":
             totalWords = 0
-            nbLongWords = 0
+            totalLongWords = 0
             totalSentences = len(self.content)
             totalCharacters = 0
             totalSyllables = 0
             nbPolysyllables = 0
             for sentence in self.content:
                 totalWords += len(sentence)
-                nbLongWords += len([token for token in sentence if len(token)>6])
+                totalLongWords += len([token for token in sentence if len(token)>6])
                 totalCharacters += sum(len(token) for token in sentence)
-                totalSyllables += sum(syllablesplit(word) for word in sentence)
-                nbPolysyllables += sum(1 for word in sentence if syllablesplit(word)>=3)
-            #TODO : put these in a Statistics class or something, and let that class be used as an attribute for Readability.
-            return 0
+                totalSyllables += sum(utils.syllablesplit(word) for word in sentence)
+                nbPolysyllables += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
+            self.statistics = Statistics()
+            self.statistics.totalWords = totalWords
+            self.statistics.totalLongWords = totalLongWords
+            self.statistics.totalSentences = totalSentences
+            self.statistics.totalCharacters = totalCharacters
+            self.statistics.totalSyllables = totalSyllables
+            self.statistics.nbPolysyllables = nbPolysyllables
+            return self
+            
 
         elif self.content_type == "corpus":
-            return 0
-            #Same thing as above, but assign every statistic to a text, somehow.
-            #I suppose we could make a self.corpus_statistics attribute with shape : dict[class][statistics]
+            stats = {}
+            for level in self.classes:
+                stats[level] = []
+                for text in self.content[level]:
+                    #This could be turned into a subroutine instead of copy pasting...
+                    totalWords = 0
+                    totalLongWords = 0
+                    totalSentences = len(text)
+                    totalCharacters = 0
+                    totalSyllables = 0
+                    nbPolysyllables = 0
+                    for sentence in text:
+                        totalWords += len(sentence)
+                        totalLongWords += len([token for token in sentence if len(token)>6])
+                        totalCharacters += sum(len(token) for token in sentence)
+                        totalSyllables += sum(utils.syllablesplit(word) for word in sentence)
+                        nbPolysyllables += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
+                    statistics = Statistics()
+                    #TODO : make code less bloated by doing something like this : 
+                    #for p in params:
+                    #    setattr(self.statistics, p, p[value])
+                    statistics.totalWords = totalWords
+                    statistics.totalLongWords = totalLongWords
+                    statistics.totalSentences = totalSentences
+                    statistics.totalCharacters = totalCharacters
+                    statistics.totalSyllables = totalSyllables
+                    statistics.nbPolysyllables = nbPolysyllables
+                    stats[level].append(statistics)
+            self.corpus_statistics = stats
+            return self
         return 0
 
-    #Note : Maybe this should go in the stats subfolder to have less bloat.
+    def stats(self):
+        """
+        Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.
+        """
+        if hasattr(self, "statistics"):
+            for stat in self.statistics.__dict__:
+                print(stat, ' = ', self.statistics.__dict__[stat])
+
+        elif hasattr(self, "corpus_statistics"):
+            print("finish r.compile() first")
+            # NOTE: show everything or show 10 first for each class or show mean? For now let's show everything.
+            for level in self.classes:
+                for stats in self.corpus_statistics[level]:
+                    for stat in stats.__dict__:
+                        print(stat, ' = ', stats.__dict__[stat])
+        else:
+            print("You need to apply the .compile() function before in order to view this text|corpus' statistics")
+
+    # NOTE: Maybe this should go in the stats subfolder to have less bloat.
     def corpus_info(self):
         """
-            Output several basic statistics such as number of texts, sentences, or tokens, alongside size of the vocabulary.
-                
-            :param corpus: Dictionary of lists of sentences (represented as a list of tokens)
-            :type corpus: dict[class][text][sentence][token]
+        Output several basic statistics such as number of texts, sentences, or tokens, alongside size of the vocabulary.
+            
+        :param corpus: Dictionary of lists of sentences (represented as a list of tokens)
+        :type corpus: dict[class][text][sentence][token]
 
-            :return: a pandas dataframe 
-            :rtype: pandas.core.frame.DataFrame
+        :return: a pandas dataframe 
+        :rtype: pandas.core.frame.DataFrame
         """
         #TODO : make that an exception instead?
         if self.content_type != "corpus":
-            print("Current input isn't recognized as a corpus. Please provide a dictionnary with the following format : dict[class][text][sentence][token]")
+            print("Current input isn't recognized as a corpus. Please provide a dictionary with the following format : dict[class][text][sentence][token]")
             return 0
         else:
             # Extract the classes from the dictionary's keys.
