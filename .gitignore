@@ -130,7 +130,13 @@ dmypy.json
 
 # Removing specific "dev help" files :
 library/DEVREADME.md
+DEVREADME.md
 library/test_data
-library/readibility/__init__.py
-library/src
+test_data
 library/pyvenv.cfg
+pyvenv.cfg
+
+# Hiding library build/config files for now
+LICENSE
+pyproject.toml
+setup.cfg
