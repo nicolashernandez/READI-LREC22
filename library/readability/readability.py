@@ -19,26 +19,23 @@ from .models import *
 #     Enable a way to "compile" in order to use underlying functions faster : ~ It's done, need to implement tests.
 #     Make sure code works both for texts (strings, or pre-tokenized texts) and corpus structure : ~ I think it works now.
 #     Add the methods related to machine learning or deep learning : X
+#     Add other measures that could be useful (Martinc Crossley): X
 #     Experiment further : X
-#     Add other measures that could be useful : X
+#     
 
-# Last task before leaving :
-#   I was using checking if Readability.score() worked, like gfi() calls score(name=gfi), less bloat.
-#   Also wanted to make a version of scores() for texts(not corpus), and an optimized version if we already know the stats
-#   Shouldn't be too hard to implement since the first point *SHOULD* work, the second point can be done by simply calling every score
-#   I don't know how long it'll take for the second point though.
 
-# NOTE: This is a bad way to make the "statistics" attribute of Readability, an instance of an object.
+
+# NOTE: There probably exists a better way to create an Statistics object as an attribute of Readability.
 class Statistics:
     pass
 
 class Readability:
     """
     The Readability class provides a way to access the underlying library modules in order to help estimate the complexity of any given text
-    List of methods : __init__, corpus_info, .common_scores, scores
-    List of attributes : content, content_type, classes, lang, nlp, perplexity_processor, statistics
+    List of methods : __init__, corpus_info, compile, stats, score(score_name), scores
+    List of attributes : content, content_type, lang, nlp, perplexity_processor, classes, statistics, corpus_statistics
 
-    In its current state, scores are only accurate for the French language, but this can change in the future.
+    In its current state, scores are meant to be used with the French language, but this can change in the future.
     """
     def __init__(self, content, lang = "fr", nlp_name = "spacy_sm", perplexity_processor = "gpt2"):
         """
@@ -81,7 +78,7 @@ class Readability:
         else:
             self.nlp = None
         
-        #Handling text that needs to be converted into lists of tokens
+        # Handling text that needs to be converted into lists of tokens
         if isinstance(content, str):
             print("DEBUG: Text recognized as string, converting to list of lists")
             self.content_type = "text"
@@ -93,14 +90,14 @@ class Readability:
                 print("WARNING : Text length is less than 100 words, some scores will be inaccurate.")
             print("DEBUG : converted content is :", self.content)
 
-        #Handling text that doesn't need to be converted
+        # Handling text that doesn't need to be converted
         elif any(isinstance(el, list) for el in content):
             print("DEBUG : Text recognized as list of sentences, not converting")
             self.content_type = "text"
             self.content = content
             print("DEBUG: recognized content is :",self.content)
 
-        #Handling text that was only converted into tokens
+        # Handling text that was only converted into tokens
         elif isinstance(content, list):
             print("DEBUG : Text is already tokenized, converting to a list of sentences")
             self.content_type = "text"
@@ -115,10 +112,10 @@ class Readability:
             print("DEBUG : converted content is :", self.content)
 
 
-        #Check if input is a corpus.
+        # Check if input is a corpus.
         else:
-            #Reminder, structure needed is : dict => list of texts => list of sentences => list of words
-            #TODO : check this with a bunch of edge cases
+            # Reminder, structure needed is : dict => list of texts => list of sentences => list of words
+            # TODO : check this with a bunch of edge cases
             if type(content) == dict:
                 if isinstance(content[list(content.keys())[0]], list):
                     if isinstance(content[list(content.keys())[0]][0], list):
@@ -156,25 +153,21 @@ class Readability:
                 print("DEBUG : pre-existing information was found")
                 return func(self.content, self.statistics)
             else:
-                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
+                print("DEBUG : pre-existing information was not found, so the .",name,"_score() function should determine it by itself")
                 return func(self.content)
         elif self.content_type == "corpus":
             scores = {}
             for level in self.classes:
                 scores[level] = []
-                #for text in self.content[level]:
                 if hasattr(self, "corpus_statistics"):
                     print("DEBUG : pre-existing information was found for a corpus")
                     for statistics in self.corpus_statistics[level]:
-                        #if we go beyond 10 texts, stop printing the score.
-                        #add the score to a dict : list like level1 : text0= 61.523 (should be smth else but yknow, wrong formula and all)
                         scores[level].append(func(None, statistics))
-                        #stats[level].append(statistics)
                 else:
                     print("DEBUG : pre-existing information was not found for a corpus")
                     for text in self.content[level]:
                         scores[level].append(func(text))
-            #output part of the scores, first 10 texts' score for each class :
+            # Output part of the scores, first 10 texts' score for each class :
             for level in self.classes:
                 for index,score in enumerate(scores[level][:10]):
                     print("class", level, "text", index, "score" ,score)
@@ -182,120 +175,64 @@ class Readability:
         else:
             return -1
         
-
-
     def gfi(self):
-        if self.content_type == "text":
-            if hasattr(self, "statistics"):
-                print("DEBUG : pre-existing information was found")
-                return common_scores.GFI_score(self.content, self.statistics)
-            else:
-                print("DEBUG : pre-existing information was not found, so GFI SHOULD determine it by itself")
-                return common_scores.GFI_score(self.content)
-        elif self.content_type == "corpus":
-            scores = {}
-            for level in self.classes:
-                scores[level] = []
-                #for text in self.content[level]:
-                if hasattr(self, "corpus_statistics"):
-                    print("DEBUG : pre-existing information was found for a corpus")
-                    for statistics in self.corpus_statistics[level]:
-                        #if we go beyond 10 texts, stop printing the score.
-                        #add the score to a dict : list like level1 : text0= 61.523 (should be smth else but yknow, wrong formula and all)
-                        scores[level].append(common_scores.GFI_score(None, statistics))
-                        #stats[level].append(statistics)
-                else:
-                    print("DEBUG : pre-existing information was not found for a corpus")
-                    for text in self.content[level]:
-                        scores[level].append(common_scores.GFI_score(text))
-            #output part of the scores, first 10 texts' score for each class :
-            for level in self.classes:
-                for index,score in enumerate(scores[level][:10]):
-                    print("class", level, "text", index, "score" ,score)
-            return scores
-        else:
-            return -1
+        """Returns Gunning Fog Index"""
+        return self.score("gfi")
+
     def ari(self):
-        if self.content_type == "text":
-            if hasattr(self, "statistics"):
-                print("DEBUG : pre-existing information was found")
-                return common_scores.ARI_score(self.content, self.statistics)
-            else:
-                print("DEBUG : pre-existing information was not found, so ARI SHOULD determine it by itself")
-                return common_scores.ARI_score(self.content)
-        elif self.content_type == "corpus":
-            print("just do a loop and return a list of scores")
-        return -1
+        """Returns Automated Readability Index"""
+        return self.score("ari")
+
     def fre(self):
-        if self.content_type == "text":
-            if hasattr(self, "statistics"):
-                print("DEBUG : pre-existing information was found")
-                return common_scores.FRE_score(self.content, self.statistics)
-            else:
-                print("DEBUG : pre-existing information was not found, so FRE SHOULD determine it by itself")
-                return common_scores.FRE_score(self.content)
-        elif self.content_type == "corpus":
-            print("just do a loop and return a list of scores")
-        return -1
+        """Returns Flesch Reading Ease"""
+        return self.score("fre")
+
     def fkgl(self):
-        if self.content_type == "text":
-            if hasattr(self, "statistics"):
-                print("DEBUG : pre-existing information was found")
-                return common_scores.FKGL_score(self.content, self.statistics)
-            else:
-                print("DEBUG : pre-existing information was not found, so FKGL SHOULD determine it by itself")
-                return common_scores.FKGL_score(self.content)
-        elif self.content_type == "corpus":
-            print("just do a loop and return a list of scores")
-        return -1
+        """Returns Flesch–Kincaid Grade Level"""
+        return self.score("fkgl")
+
     def smog(self):
-        if self.content_type == "text":
-            if hasattr(self, "statistics"):
-                print("DEBUG : pre-existing information was found")
-                return common_scores.SMOG_score(self.content, self.statistics)
-            else:
-                print("DEBUG : pre-existing information was not found, so SMOG SHOULD determine it by itself")
-                return common_scores.SMOG_score(self.content)
-        elif self.content_type == "corpus":
-            print("just do a loop and return a list of scores")
-        return -1
+        """Returns Simple Measure of Gobbledygook"""
+        return self.score("smog")
+
     def rel(self):
-        if self.content_type == "text":
-            if hasattr(self, "statistics"):
-                print("DEBUG : pre-existing information was found")
-                return common_scores.REL_score(self.content, self.statistics)
-            else:
-                print("DEBUG : pre-existing information was not found, so REL SHOULD determine it by itself")
-                return common_scores.REL_score(self.content)
-        elif self.content_type == "corpus":
-            print("just do a loop and return a list of scores")
-        return -1
+        """Returns Reading Ease Level (Adaptation of FRE for french)"""
+        return self.score("rel")
+
     def scores(self):
         """
-        Returns common readability scores
+        Depending on type of content provided, returns a list of common readability scores (type=text),
+        or returns a matrix containing the mean values for these scores, depending on the classes of the corpus (type=corpus) 
 
-        :return: a pandas dataframe 
-        :rtype: pandas.core.frame.DataFrame 
+        :return: a pandas dataframe (or a list of scores)
+        :rtype: Union[pandas.core.frame.DataFrame,list] 
         """
-        #return an optimized version of the previous scores.
-        #Calling each function implies making an if branch for every text encountered. Profiling is needed to see if this has an impact on performance or not
-        #TODO : improve further by giving the self.corpus_statistics once we figure out how to make it.
+        #FIXME : Would be better to have this point to a scores_text() and scores_corpus(), which returns only one type.
         if self.content_type == "corpus":
-            return common_scores.traditional_scores(self.content)
+            if hasattr(self, "corpus_statistics"):
+                print("DEBUG : pre-existing information was found for a corpus")
+                return common_scores.traditional_scores(self.content, self.corpus_statistics)
+            else:
+                print("DEBUG : pre-existing information was NOT found for a corpus")
+                return common_scores.traditional_scores(self.content)
+
         elif self.content_type == "text":
-            #TODO : call each score and put that in a list.
-            print("todo : make list of scores")
-            return -1
+            scores = ["gfi","ari","fre","fkgl","smog","rel"]
+            values = []
+            for score in scores:
+                values.append(self.score(score))
+            return values
 
 
     def compile(self):
         """
         Calculates a bunch of statistics to make some underlying functions faster.
         Simply do X = X.compile()
-        This returns a copy a Readability instance, supplemented with a "statistics" or "corpus_statistics" attribute that can be used for other functions.
+        This returns a copy of a Readability instance, supplemented with a "statistics" or "corpus_statistics" attribute that can be used for other functions.
         """
         #TODO : debloat this and/or refactor it since we copy-paste almost the same below
         if self.content_type == "text":
+            #I can probably do self.statistics.totalWords = 0 directly..
             totalWords = 0
             totalLongWords = 0
             totalSentences = len(self.content)
@@ -354,6 +291,7 @@ class Readability:
     def stats(self):
         """
         Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.
+        In this case, this will output the statistics for the first ten texts for every class
         """
         if hasattr(self, "statistics"):
             for stat in self.statistics.__dict__:
@@ -361,13 +299,12 @@ class Readability:
 
         elif hasattr(self, "corpus_statistics"):
             print("finish r.compile() first")
-            # NOTE: show everything or show 10 first for each class or show mean? For now let's show everything.
             for level in self.classes:
-                for stats in self.corpus_statistics[level]:
+                for stats in self.corpus_statistics[level][:10]:
                     for stat in stats.__dict__:
                         print(stat, ' = ', stats.__dict__[stat])
         else:
-            print("You need to apply the .compile() function before in order to view this text|corpus' statistics")
+            print("You need to apply the .compile() function before in order to view this",self.content_type,"' statistics")
 
     # NOTE: Maybe this should go in the stats subfolder to have less bloat.
     def corpus_info(self):

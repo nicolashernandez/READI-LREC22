@@ -97,8 +97,6 @@ def REL_score(text, statistics=None):
     score_REL = 207-1.015*(totalWords/totalSentences)-73.6*(totalSyllables/totalWords)
     return(score_REL)
 
-
-#TODO : When given self.statistics (or something equivalent since it's a corpus), bypass some calculations to optimize a bit further.
 def traditional_scores(corpus, statistics=None):
     """
     Outputs a pandas dataframe containing the mean scores for various traditional readability measures.
@@ -119,35 +117,49 @@ def traditional_scores(corpus, statistics=None):
     FKGL = {}
     SMOG = {}
     REL = {}
-    for level in levels:
-        GFI[level] = []
-        ARI[level] = []
-        FRE[level] = []
-        FKGL[level] = []
-        SMOG[level] = []
-        REL[level] = []
-        for text in corpus[level]:
-            totalWords = 0
-            totalLongWords = 0
-            totalSentences = len(text)
-            totalCharacters = 0
-            totalSyllables = 0
-            nbPolysyllables = 0
-            for sent in text:
-                totalWords += len(sent)
-                totalLongWords += len([token for token in sent if len(token)>6])
-                totalCharacters += sum(len(token) for token in sent)
-                totalSyllables += sum(utils.syllablesplit(word) for word in sent)
-                nbPolysyllables += sum(1 for word in sent if utils.syllablesplit(word)>=3) 
-            GFI[level].append(0.4*((totalWords/totalSentences) + 100*totalLongWords/totalSentences))
-            ARI[level].append(4.71*((totalCharacters/totalWords) + 0.5*totalWords/totalSentences)-21.43)
-            FRE[level].append(206.835-1.015*(totalWords/totalSentences)-84.6*(totalSyllables/totalWords))
-            FKGL[level].append(0.39*(totalWords/totalSentences)+11.8*(totalSyllables/totalWords)-15.59)
-            SMOG[level].append(1.043*math.sqrt(nbPolysyllables*(30/totalSentences))+3.1291)
-            REL[level].append(207-1.015*(totalWords/totalSentences)-73.6*(totalSyllables/totalWords))
+    if statistics is not None:
+        for level in levels:
+            GFI[level] = []
+            ARI[level] = []
+            FRE[level] = []
+            FKGL[level] = []
+            SMOG[level] = []
+            REL[level] = []
+            for stats in statistics[level]:
+                GFI[level].append(0.4*((stats.totalWords/stats.totalSentences) + 100*stats.totalLongWords/stats.totalSentences))
+                ARI[level].append(4.71*((stats.totalCharacters/stats.totalWords) + 0.5*stats.totalWords/stats.totalSentences)-21.43)
+                FRE[level].append(206.835-1.015*(stats.totalWords/stats.totalSentences)-84.6*(stats.totalSyllables/stats.totalWords))
+                FKGL[level].append(0.39*(stats.totalWords/stats.totalSentences)+11.8*(stats.totalSyllables/stats.totalWords)-15.59)
+                SMOG[level].append(1.043*math.sqrt(stats.nbPolysyllables*(30/stats.totalSentences))+3.1291)
+                REL[level].append(207-1.015*(stats.totalWords/stats.totalSentences)-73.6*(stats.totalSyllables/stats.totalWords))
+    else:
+        for level in levels:
+            GFI[level] = []
+            ARI[level] = []
+            FRE[level] = []
+            FKGL[level] = []
+            SMOG[level] = []
+            REL[level] = []
+            for text in corpus[level]:
+                totalWords = 0
+                totalLongWords = 0
+                totalSentences = len(text)
+                totalCharacters = 0
+                totalSyllables = 0
+                nbPolysyllables = 0
+                for sent in text:
+                    totalWords += len(sent)
+                    totalLongWords += len([token for token in sent if len(token)>6])
+                    totalCharacters += sum(len(token) for token in sent)
+                    totalSyllables += sum(utils.syllablesplit(word) for word in sent)
+                    nbPolysyllables += sum(1 for word in sent if utils.syllablesplit(word)>=3) 
+                GFI[level].append(0.4*((totalWords/totalSentences) + 100*totalLongWords/totalSentences))
+                ARI[level].append(4.71*((totalCharacters/totalWords) + 0.5*totalWords/totalSentences)-21.43)
+                FRE[level].append(206.835-1.015*(totalWords/totalSentences)-84.6*(totalSyllables/totalWords))
+                FKGL[level].append(0.39*(totalWords/totalSentences)+11.8*(totalSyllables/totalWords)-15.59)
+                SMOG[level].append(1.043*math.sqrt(nbPolysyllables*(30/totalSentences))+3.1291)
+                REL[level].append(207-1.015*(totalWords/totalSentences)-73.6*(totalSyllables/totalWords))
     
-
-    #TODO : keep improving from here.
     # Calculating means
     moy_GFI = []
     moy_ARI = []
@@ -239,8 +251,10 @@ def traditional_scores(corpus, statistics=None):
     maxSMOG = max(SMOG_list)
     SMOG_list = [val/maxSMOG for val in SMOG_list]
     maxREL = max(REL_list)
+
     #FRE_list = [val/maxFRE for val in FRE_list]
     # ^In the notebook, this is incorrect, need to fix
+
     REL_list = [val/maxREL for val in REL_list]
     pearson.append(pearsonr(GFI_list,labels)[0])
     pearson.append(pearsonr(ARI_list,labels)[0])
@@ -262,5 +276,5 @@ def traditional_scores(corpus, statistics=None):
     print(math_formulas_stddev)
 
 
-    print("time elapsed perf counter:", time.perf_counter() - t0)
+    print("DEBUG: time elapsed perf counter:", time.perf_counter() - t0)
     return math_formulas
