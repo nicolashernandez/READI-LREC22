@@ -19,6 +19,7 @@ from .models import *
 #     Enable a way to "compile" in order to use underlying functions faster : ~ It's done, need to implement tests.
 #     Make sure code works both for texts (strings, or pre-tokenized texts) and corpus structure : ~ I think it works now.
 #     Add the methods related to machine learning or deep learning : X
+#     Add examples to the notebook to show how it can be used : X
 #     Add other measures that could be useful (Martinc Crossley): X
 #     Experiment further : X
 #     
@@ -37,7 +38,7 @@ class Readability:
 
     In its current state, scores are meant to be used with the French language, but this can change in the future.
     """
-    def __init__(self, content, lang = "fr", nlp_name = "spacy_sm", perplexity_processor = "gpt2"):
+    def __init__(self, content, lang = "fr", nlp = "spacy_sm", perplexity_processor = "gpt2"):
         """
         Constructor of the Readability class, won't return any value but creates the attributes :
         self.content, self.content_type, self.nlp, self.lang, and self.classes only if input is a corpus.
@@ -48,13 +49,13 @@ class Readability:
         :param lang: Language the text was written in, in order to adapt some scores.
         :type lang: str
 
-        :param nlp_name: Type of NLP processor to use, indicated by a "type_subtype" string.
-        :type nlp_name: str
+        :param nlp: Type of NLP processor to use, indicated by a "type_subtype" string.
+        :type nlp: str
 
         :param perplexity_processor: Type of processor to use for the calculation of pseudo-perplexity
         :type perplexity_processor: str
         """
-        print("DEBUG : Current parameters of Readability class : lang=",lang, "nlp_name=",nlp_name,"ppl_processor=",perplexity_processor)
+        print("DEBUG : Current parameters of Readability class : lang=",lang, "nlp=",nlp,"ppl_processor=",perplexity_processor)
         self.lang = lang
         self.perplexity_processor = perplexity_processor
 
@@ -64,7 +65,7 @@ class Readability:
         # fr_core_news_sm@https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.3.0/fr_core_news_sm-3.3.0.tar.gz#egg=fr_core_news_sm
         # But I can't figure out how to use it, so this is a workaround.
         print("Acquiring Natural Language Processor...")
-        if lang == "fr" and nlp_name == "spacy_sm":
+        if lang == "fr" and nlp == "spacy_sm":
             try:
                 self.nlp = spacy.load('fr_core_news_sm')
                 print("DEBUG: Spacy model location (already installed) : ",self.nlp._path)
@@ -76,18 +77,22 @@ class Readability:
                 self.nlp = spacy.load('fr_core_news_sm')
                 print("DEBUG: Spacy model location : ",self.nlp._path)
         else:
+            print("ERROR : Natural Language Processor not found for parameters :  lang=",lang," nlp=",nlp,sep="")
             self.nlp = None
         
         # Handling text that needs to be converted into lists of tokens
+        # NOTE: maybe remove punctuation by checking token.is_punct?
         if isinstance(content, str):
             print("DEBUG: Text recognized as string, converting to list of lists")
             self.content_type = "text"
             self.content = [[token.text for token in sent] for sent in self.nlp(content).sents]
+            #self.content = [[token.text for token in sent if not token.is_punct] for sent in self.nlp(content).sents]
             nb_words = 0
             for sentence in self.content:
                 nb_words += len(sentence)
             if nb_words < 101:
                 print("WARNING : Text length is less than 100 words, some scores will be inaccurate.")
+            print(nb_words)
             print("DEBUG : converted content is :", self.content)
 
         # Handling text that doesn't need to be converted
@@ -103,10 +108,10 @@ class Readability:
             self.content_type = "text"
             content = ' '.join(content)
             self.content = [[token.text for token in sent] for sent in self.nlp(content).sents]
+            #self.content = [[token.text for token in sent if not token.is_punct] for sent in self.nlp(content).sents]
             nb_words = 0
             for sentence in self.content:
-                for token in sentence:
-                    nb_words += len(sentence)
+                nb_words += len(sentence)
             if nb_words < 101:
                 print("WARNING : Text length is less than 100 words, scores will be inaccurate and meaningless.")
             print("DEBUG : converted content is :", self.content)
@@ -124,6 +129,8 @@ class Readability:
                             self.content_type = "corpus"
                             self.content = content
                             self.classes = list(content.keys())
+            #else, check if the structure is dict[string] and tokenize everything (warn user it'll take some time)
+            #and then use that as the new structure
 
     def score(self, name):
         """
@@ -153,7 +160,7 @@ class Readability:
                 print("DEBUG : pre-existing information was found")
                 return func(self.content, self.statistics)
             else:
-                print("DEBUG : pre-existing information was not found, so the .",name,"_score() function should determine it by itself")
+                print("DEBUG : pre-existing information was not found, so the .",name,"_score() function should determine it by itself", sep="")
                 return func(self.content)
         elif self.content_type == "corpus":
             scores = {}
@@ -167,10 +174,9 @@ class Readability:
                     print("DEBUG : pre-existing information was not found for a corpus")
                     for text in self.content[level]:
                         scores[level].append(func(text))
-            # Output part of the scores, first 10 texts' score for each class :
+            # Output part of the scores, first text for each class
             for level in self.classes:
-                for index,score in enumerate(scores[level][:10]):
-                    print("class", level, "text", index, "score" ,score)
+                print("class", level, "text 0", "score" ,scores[level][0])
             return scores
         else:
             return -1
@@ -218,9 +224,9 @@ class Readability:
 
         elif self.content_type == "text":
             scores = ["gfi","ari","fre","fkgl","smog","rel"]
-            values = []
+            values = {}
             for score in scores:
-                values.append(self.score(score))
+                values[score] = self.score(score)
             return values
 
 
@@ -297,12 +303,13 @@ class Readability:
             for stat in self.statistics.__dict__:
                 print(stat, ' = ', self.statistics.__dict__[stat])
 
+        #maybe i should just return the mean values?
         elif hasattr(self, "corpus_statistics"):
             print("finish r.compile() first")
             for level in self.classes:
-                for stats in self.corpus_statistics[level][:10]:
-                    for stat in stats.__dict__:
-                        print(stat, ' = ', stats.__dict__[stat])
+                print("Class", level)
+                for stat in self.corpus_statistics[level][0].__dict__:
+                    print(stat, "=", self.corpus_statistics[level][0].__dict__[stat])
         else:
             print("You need to apply the .compile() function before in order to view this",self.content_type,"' statistics")
 

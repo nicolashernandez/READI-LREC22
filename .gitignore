@@ -133,3 +133,4 @@ library/DEVREADME.md
 library/test_data
 library/readibility/__init__.py
 library/src
+library/pyvenv.cfg

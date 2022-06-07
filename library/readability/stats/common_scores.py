@@ -268,7 +268,6 @@ def traditional_scores(corpus, statistics=None):
     math_formulas.index = ["The Gunning fog index GFI", "The Automated readability index ARI","The Flesch reading ease FRE","The Flesch-Kincaid grade level FKGL","The Simple Measure of Gobbledygook SMOG","Reading Ease Level"]
     math_formulas['Pearson Score'] = pearson
     math_formulas.columns.name = "Mean values"
-    print(math_formulas)
     
     math_formulas_stddev = pd.DataFrame([stddev_GFI,stddev_ARI,stddev_FRE,stddev_FKGL,stddev_SMOG,stddev_REL],columns=levels)
     math_formulas_stddev.index = ["The Gunning fog index GFI", "The Automated readability index ARI","The Flesch reading ease FRE","The Flesch-Kincaid grade level FKGL","The Simple Measure of Gobbledygook SMOG","Reading Ease Level"]
