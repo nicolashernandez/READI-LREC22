@@ -108,8 +108,6 @@ def traditional_scores(corpus, statistics=None):
     """
     #Optimization : Calculate each score at once, since they share some parameters.
     from scipy.stats import pearsonr
-    import time
-    t0 = time.perf_counter()
     levels = list(corpus.keys())
     GFI = {}
     ARI = {}
@@ -274,6 +272,4 @@ def traditional_scores(corpus, statistics=None):
     math_formulas_stddev.columns.name = "Standard Deviation values"
     print(math_formulas_stddev)
 
-
-    print("DEBUG: time elapsed perf counter:", time.perf_counter() - t0)
     return math_formulas

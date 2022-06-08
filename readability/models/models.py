@@ -9,6 +9,6 @@ Use the model for different tasks
 """
 
 
-#get the stuff here https://colab.research.google.com/drive/1O7YBbukN8uhvY8IYI9zhYCRVrAR8Gnzt#scrollTo=qDgTAtF2sIMv
+# get the stuff here https://colab.research.google.com/drive/1O7YBbukN8uhvY8IYI9zhYCRVrAR8Gnzt#scrollTo=qDgTAtF2sIMv
 # Reproduire fasttext for all corpus several times : X
 # Et reproduire bert for all corpus, several models several times : X
