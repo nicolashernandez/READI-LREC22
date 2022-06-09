@@ -15,6 +15,32 @@ placed in the data directory
 import numpy as np
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
+from csv import DictReader
+
+def demo_get_csv_fieldnames(DATA_PATH):
+  # open file in read mode
+  with open(DATA_PATH, 'r') as read_obj:
+    # pass the file object to reader() to get the reader object
+    csv_dict_reader = DictReader(read_obj)
+    # get column names from a csv file
+    return csv_dict_reader.fieldnames
+
+def demo_get_labels(DATA_PATH):
+  labels = list()
+  # open file in read mode
+  with open(DATA_PATH, 'r') as read_obj:
+    # pass the file object to reader() to get the reader object
+    csv_dict_reader = DictReader(read_obj)
+    # get column names from a csv file
+    column_names = csv_dict_reader.fieldnames
+    print(column_names)
+    for row in csv_dict_reader:
+        #print(row['review'], row['positive'], row['negative'])
+        labels.append(row['label'])
+  return list(set(labels))  
+
+
+
 
 def demo_compute_evaluation_metrics(cm, round = -1, data_name = '', class_names=''): 
   # ktrain learner.validate(class_names=class_names) return the confusion matrix

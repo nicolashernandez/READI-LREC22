@@ -6,27 +6,7 @@ from ktrain import text
 from csv import DictReader
 
 
-def demo_get_csv_fieldnames(DATA_PATH):
-  # open file in read mode
-  with open(DATA_PATH, 'r') as read_obj:
-    # pass the file object to reader() to get the reader object
-    csv_dict_reader = DictReader(read_obj)
-    # get column names from a csv file
-    return csv_dict_reader.fieldnames
 
-def demo_get_labels(DATA_PATH):
-  labels = list()
-  # open file in read mode
-  with open(DATA_PATH, 'r') as read_obj:
-    # pass the file object to reader() to get the reader object
-    csv_dict_reader = DictReader(read_obj)
-    # get column names from a csv file
-    column_names = csv_dict_reader.fieldnames
-    print(column_names)
-    for row in csv_dict_reader:
-        #print(row['review'], row['positive'], row['negative'])
-        labels.append(row['label'])
-  return list(set(labels))  
 
 def demo_getFastText(DATA_PATH, class_names):
     NUM_WORDS = 50000
@@ -59,8 +39,16 @@ def demo_getFastText(DATA_PATH, class_names):
 
 
 
-def demo_doFastText():
-    corpusnames = ['ljl'] #, 'bibebook.com', 'JeLisLibre']
+def demo_doFastText(name='ljl'):
+    corpusnames = ['ljl']
+    if name == 'all':
+        corpusnames = ['ljl', 'bibebook.com', 'JeLisLibre']
+    elif name == "bibebook.com":
+        corpusnames = ['bibebook.com']
+    elif name == "JeLisLibre":
+        corpusnames = ['JeLisLibre']
+    elif name != "ljl":
+        raise ValueError("Please provide one of the following parameters instead : 'ljl', 'bibebook.com', 'JeLisLibre', or 'all'")
 
     results_summary = list()
     class_names_list = list()
@@ -74,7 +62,7 @@ def demo_doFastText():
 
 
         #class_names =  get_labels(DATA_PATH)   
-        class_names =  demo_get_csv_fieldnames(DATA_PATH)[2:]
+        class_names =  models.demo_get_csv_fieldnames(DATA_PATH)[2:]
         class_names_list.append(class_names)
         #
         (x_train, y_train), (x_test, y_test), preproc, model, learner = demo_getFastText(DATA_PATH, class_names=class_names)
@@ -128,13 +116,13 @@ def demo_doFastText():
 
     return -1
 
-def demo_checkLR():
-    DATA_PATH = os.path.join(os.getcwd(),'data','ljl')+ '_hotvector.csv'
+def demo_checkLR(name='ljl'):
+    DATA_PATH = os.path.join(os.getcwd(),'data',name)+ '_hotvector.csv'
     #DATA_PATH = os.getcwd()+'/gdrive/MyDrive/data/'+ corpusname + '.csv'
     #DATA_PATH = corpusname + '_hotvector.csv'
 
     #class_names =  get_labels(DATA_PATH)   
-    class_names =  demo_get_csv_fieldnames(DATA_PATH)[2:]
+    class_names =  models.demo_get_csv_fieldnames(DATA_PATH)[2:]
     print (class_names)    
 
     (x_train, y_train), (x_test, y_test), preproc, model, learner = demo_getFastText(DATA_PATH, class_names=class_names)

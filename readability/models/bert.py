@@ -5,7 +5,7 @@ import ktrain
 from ktrain import text
 import os
 
-def loadCorpusForTransformer(DATA_PATH, random_seed = 42):
+def demo_loadCorpusForTransformer(DATA_PATH, random_seed = 42):
   with open(DATA_PATH, 'r' ) as f:
     #reader = csv.DictReader(f)
     #x_train = [line['text'] for line in reader]
@@ -32,7 +32,7 @@ def loadCorpusForTransformer(DATA_PATH, random_seed = 42):
     #      print(line)
 
 
-def getTransformer (model_name, x_train, y_train, x_test, y_test, class_names, batch_size=6):
+def demo_getTransformer(model_name, x_train, y_train, x_test, y_test, class_names, batch_size=6):
   t = text.Transformer(model_name, 
                      #maxlen=500, 
                      class_names=class_names #,
@@ -57,7 +57,7 @@ def getTransformer (model_name, x_train, y_train, x_test, y_test, class_names, b
   return t, trn, val, model, learner
 
 
-def doBertDemo():
+def demo_doBert(name='ljl'):
     #MODEL_NAME = 'distilbert-base-uncased'
     #MODEL_NAME = 'camembert-base'# https://huggingface.co/camembert-base ; https://camembert-model.fr/
     #MODEL_NAME = 'flaubert/flaubert_base_cased' # https://huggingface.co/flaubert/flaubert_base_cased
@@ -67,13 +67,15 @@ def doBertDemo():
     #MODEL_NAME = 'bert-base-multilingual-cased' # https://huggingface.co/bert-base-multilingual-cased ; https://github.com/deepset-ai/bert-tensorflow/blob/master/samples/bert_config.json
     #MODEL_NAME = 'bert-base-cased'
 
-    #from google.colab import drive
-
-    #drive.mount('/content/gdrive')
-
-    #corpusnames = ['ljl', 'bibebook.com', 'JeLisLibre']
     corpusnames = ['ljl']
-
+    if name == 'all':
+        corpusnames = ['ljl', 'bibebook.com', 'JeLisLibre']
+    elif name == "bibebook.com":
+        corpusnames = ['bibebook.com']
+    elif name == "JeLisLibre":
+        corpusnames = ['JeLisLibre']
+    elif name != "ljl":
+        raise ValueError("Please provide one of the following parameters instead : 'ljl', 'bibebook.com', 'JeLisLibre', or 'all'")
 
 
     #model_names = ['bert-base-multilingual-cased', 'camembert-base', 'flaubert/flaubert_base_cased'] #]
@@ -96,15 +98,15 @@ def doBertDemo():
             #DATA_PATH = corpusname + '_hotvector.csv'
 
             #class_names =  get_labels(DATA_PATH)   
-            class_names =  models.get_csv_fieldnames(DATA_PATH)[2:]
+            class_names =  models.demo_get_csv_fieldnames(DATA_PATH)[2:]
             class_names_list.append(class_names)
 
-            x_train, x_test, y_train, y_test = loadCorpusForTransformer(DATA_PATH)
+            x_train, x_test, y_train, y_test = demo_loadCorpusForTransformer(DATA_PATH)
 
             print ('CORPUS_NAME', CORPUSNAME, 'MODEL_NAME', MODEL_NAME, 'class_names', class_names)
 
             print ('--> getTransformer')
-            t, trn, val, model, learner = getTransformer(MODEL_NAME, x_train, y_train, x_test, y_test, class_names)
+            t, trn, val, model, learner = demo_getTransformer(MODEL_NAME, x_train, y_train, x_test, y_test, class_names)
 
             # EXPLORATION
             if number_of_run <0:
@@ -142,14 +144,14 @@ def doBertDemo():
             for cm in results:
                 cm_init += cm
             results_summary.append(cm_init)
-            models.pp.pprint(models.compute_evaluation_metrics(cm_init,round=2, data_name=CORPUSNAME, class_names=class_names))
+            models.pp.pprint(models.demo_compute_evaluation_metrics(cm_init,round=2, data_name=CORPUSNAME, class_names=class_names))
 
             
         print ('-------------------------------------------------------------')
         print ('total run', RUN, 'MODEL_NAME',MODEL_NAME)
         for i in range(len(corpusnames)):
             print ('CORPUSNAME', corpusnames[i], 'CORPUSNAME', corpusnames[i])
-            r = models.compute_evaluation_metrics(results_summary[i],round=2, data_name=corpusnames[i], class_names=class_names_list[i])
+            r = models.demo_compute_evaluation_metrics(results_summary[i],round=2, data_name=corpusnames[i], class_names=class_names_list[i])
             models.pp.pprint(r)
 
             multicol_list = list()
@@ -170,5 +172,3 @@ def doBertDemo():
             print ('\t&'+'\t&'.join(line)+'\\\\')
             print()
     return 0
-
-
