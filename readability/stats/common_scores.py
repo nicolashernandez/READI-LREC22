@@ -5,6 +5,7 @@ Can be improved by changing formulas/calculations depending on language.
 import math
 from unidecode import unidecode
 import pandas as pd
+from scipy.stats import pearsonr
 from .. import utils
 
 
@@ -107,7 +108,6 @@ def traditional_scores(corpus, statistics=None):
     :rtype: pandas.core.frame.DataFrame
     """
     #Optimization : Calculate each score at once, since they share some parameters.
-    from scipy.stats import pearsonr
     levels = list(corpus.keys())
     GFI = {}
     ARI = {}
