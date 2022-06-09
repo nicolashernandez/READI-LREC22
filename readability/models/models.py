@@ -8,6 +8,15 @@ Train the model (and optionally save it)
 Use the model for different tasks
 """
 
+#Temporary reminder : 
+# In the notebook, call doFastTextDemo
+# TODO : make it accept a path for wget or
+# It extracts class names based on file inked to that data path (only csv in a certain format for now)
+# It then calls getFastText based on that content of that file, since it relis on text.texts_from_csv.
+# Then it does a bunch of stuff from the ktrain library ktrain
+# Then uses a self_defined compute_evaluation_metrics to return metrics in a dict, using numpy
+# Finally, it prints a bunch the results in latex format thanks to pprint
+
 
 import numpy as np
 import ktrain
@@ -89,7 +98,7 @@ def get_csv_fieldnames(DATA_PATH):
 
 
 
-def getFastText (DATA_PATH, class_names="None"):
+def getFastText (DATA_PATH, class_names): #Was class_names=class_names in the previous iteration but we can't pre-define that..
     NUM_WORDS = 50000
     MAXLEN = 150
     #NGRAMS_SIZE = 1# 1 # 8 minutes avec 2
@@ -120,19 +129,22 @@ def getFastText (DATA_PATH, class_names="None"):
 
 
 
-def doFastText():
+def doFastTextDemo():
     corpusnames = ['ljl'] #, 'bibebook.com', 'JeLisLibre']
 
     results_summary = list()
     class_names_list = list()
 
     for CORPUSNAME in corpusnames:
-        DATA_PATH = os.getcwd()+'/gdrive/MyDrive/data/2022_readi/first-submission/'+ CORPUSNAME + '_hotvector.csv'
+        
+        DATA_PATH = os.path.join(os.getcwd(),'data','ljl')+ '_hotvector.csv'
+        #DATA_PATH = os.getcwd()+'/gdrive/MyDrive/data/2022_readi/first-submission/'+ CORPUSNAME + '_hotvector.csv'
         #DATA_PATH = os.getcwd()+'/gdrive/MyDrive/data/'+ corpusname + '.csv'
         #DATA_PATH = corpusname + '_hotvector.csv'
 
+
         #class_names =  get_labels(DATA_PATH)   
-        class_names =  get_csv_fieldnames   (DATA_PATH)[2:]
+        class_names =  get_csv_fieldnames(DATA_PATH)[2:]
         class_names_list.append(class_names)
         #
         (x_train, y_train), (x_test, y_test), preproc, model, learner = getFastText(DATA_PATH, class_names=class_names)
@@ -184,7 +196,6 @@ def doFastText():
         print (header)
         print ('\t&'+'\t&'.join(line)+'\\\\')
 
-
     return -1
-def doBert():
+def doBertDemo():
     return -1
