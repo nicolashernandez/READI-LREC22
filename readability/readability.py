@@ -11,8 +11,8 @@ import pandas as pd
 import spacy
 import utils
 from .stats import diversity, perplexity, common_scores
-from .methods import *
-from .models import *
+from .methods import methods
+from .models import bert, fasttext, models
 
 # Checklist :
 #     Remake structure to help differenciate between functions : ~ I think it's okay but I need some feedback
@@ -292,11 +292,12 @@ class Readability:
         #maybe i should just return the mean values?
         elif hasattr(self, "corpus_statistics"):
             for level in self.classes:
-                print("Class", level)
+                print("Class", level, "first text's values")
                 for stat in self.corpus_statistics[level][0].__dict__:
                     print(stat, "=", self.corpus_statistics[level][0].__dict__[stat])
         else:
             print("You need to apply the .compile() function before in order to view this",self.content_type,"' statistics")
+
 
     # NOTE: Maybe this should go in the stats subfolder to have less bloat.
     def corpus_info(self):

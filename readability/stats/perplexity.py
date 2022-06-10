@@ -5,7 +5,7 @@ import numpy as np
 import math
 
 class PPPL_calculator:
-    def load_model(self, perplexity_processor):
+    def load_model(self, perplexity_processor = None):
 
         #TODO: change this based on perplexity_processor.
 
