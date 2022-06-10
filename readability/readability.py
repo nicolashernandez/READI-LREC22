@@ -24,6 +24,10 @@ from .models import bert, fasttext, models
 #     Experiment further : X
 #     
 
+#10/06/22 checklist :
+# fix division by 0 error when encountering empty texts
+# convert demo_ functions into more user-friendly functions, with detailed documentation
+# figure out why some results are slightly off compared to what's in the paper
 
 
 # NOTE: There probably exists a better way to create an Statistics object as an attribute of Readability.

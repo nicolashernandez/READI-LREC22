@@ -40,14 +40,14 @@ def demo_convert_corpus_to_list(corpus):
     for level in corpus.keys():
         for text in corpus[level]:
           tex = []
-          labels_split.append(int(level[-1]))
+          labels_split.append(list(corpus.keys()).index(level))
           for sent in text:
             for token in sent:
               tex.append(token.replace('\u200b',''))
           corpus_as_list.append(tex)
     return corpus_as_list, labels_split
 
-def demo_doModels(corpus, plot=False):
+def demo_doMethods(corpus, plot=False):
     # prep vectorzation
     tfidf_vectorizer = TfidfVectorizer(analyzer='word',
         tokenizer=demo_dummy_fun,
@@ -73,29 +73,29 @@ def demo_doModels(corpus, plot=False):
     pd.DataFrame(tfidf_matrix, columns=tfidf_vectorizer.get_feature_names())
 
     #prep/do models
-    models = [
-    RandomForestClassifier(n_estimators=200, max_depth=3, random_state=0),
-    LinearSVC(class_weight='balanced', random_state=0),
-    MultinomialNB(),
-    LogisticRegression(random_state=0), MLPClassifier(random_state=0)
-    ]
-    CV = 5
-    cv_df = pd.DataFrame(index=range(CV * len(models)))
-    entries = []
-    for model in models:
-        model_name = model.__class__.__name__
-        accuracies = cross_val_score(model, tfidf_matrix, labels_split, scoring='accuracy', cv=CV)
-        for fold_idx, accuracy in enumerate(accuracies):
-            entries.append((model_name, fold_idx, accuracy))
-    cv_df = pd.DataFrame(entries, columns=['model_name', 'fold_idx', 'accuracy'])
-    if plot:
-        sns.boxplot(x='model_name', y='accuracy', data=cv_df)
-        sns.stripplot(x='model_name', y='accuracy', data=cv_df, 
-                    size=8, jitter=True, edgecolor="gray", linewidth=2)
-        plt.show()
+    #models = [
+    #RandomForestClassifier(n_estimators=200, max_depth=3, random_state=0),
+    #LinearSVC(class_weight='balanced', random_state=0),
+    #MultinomialNB(),
+    #LogisticRegression(random_state=0), MLPClassifier(random_state=0)
+    #]
+    #CV = 5
+    #cv_df = pd.DataFrame(index=range(CV * len(models)))
+    #entries = []
+    #for model in models:
+    #    model_name = model.__class__.__name__
+    #    accuracies = cross_val_score(model, tfidf_matrix, labels_split, scoring='accuracy', cv=CV)
+    #    for fold_idx, accuracy in enumerate(accuracies):
+    #        entries.append((model_name, fold_idx, accuracy))
+    #cv_df = pd.DataFrame(entries, columns=['model_name', 'fold_idx', 'accuracy'])
+    #if plot:
+    #    sns.boxplot(x='model_name', y='accuracy', data=cv_df)
+    #    sns.stripplot(x='model_name', y='accuracy', data=cv_df, 
+    #                size=8, jitter=True, edgecolor="gray", linewidth=2)
+    #    plt.show()
 
-    # show diff model general results output results
-    print(cv_df.groupby('model_name').accuracy.mean())
+    ## show diff model general results output results
+    #print(cv_df.groupby('model_name').accuracy.mean())
 
     # show detailed results for mlp
     print("MLP RESULTS")
@@ -103,7 +103,7 @@ def demo_doModels(corpus, plot=False):
     x = tfidf_matrix
     y = labels_split
     cvs=cross_val_score(model,x,y,scoring='accuracy',cv=5)
-    print('cross_val_scores=  ',cvs.mean())
+    print('cross-validation result for 5 runs =',cvs.mean())
     y_pred=cross_val_predict(model,x,y,cv=5)
     if plot:
         conf_mat=confusion_matrix(y_pred,y)
@@ -122,7 +122,7 @@ def demo_doModels(corpus, plot=False):
     x = tfidf_matrix
     y = labels_split
     cvs=cross_val_score(model,x,y,scoring='accuracy',cv=5)
-    print('cross_val_scores=  ',cvs.mean())
+    print('cross-validation result for 5 runs =',cvs.mean())
     y_pred=cross_val_predict(model,x,y,cv=5)
     if plot:
         conf_mat=confusion_matrix(y_pred,y)

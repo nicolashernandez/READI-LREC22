@@ -75,7 +75,8 @@ def FKGL_score(text, statistics=None):
     score_FKGL = 0.39*(totalWords/totalSentences)+11.8*(totalSyllables/totalWords)-15.59
     return(score_FKGL)
 
-# Note : the nbPolysyllables previously erroneously returned their own number of syllables instead of incrementing the counter by one.
+# FIXME : the nbPolysyllables erroneously returns their own number of syllables instead of incrementing the counter by one.
+# Keeping as is for now
 def SMOG_score(text, statistics=None):
     if statistics is not None:
         return 1.043*math.sqrt(statistics.nbPolysyllables*(30/statistics.totalSentences))+3.1291
