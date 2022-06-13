@@ -5,19 +5,13 @@ import os
 from ktrain import text
 from csv import DictReader
 
-
-
-
 def demo_getFastText(DATA_PATH, class_names):
     NUM_WORDS = 50000
     MAXLEN = 150
-    #NGRAMS_SIZE = 1# 1 # 8 minutes avec 2
-    # nbsvm 
+    #NGRAMS_SIZE = 1 # 8 minutes avec 2
     #NUM_WORDS = 80000
     #MAXLEN = 2000
     NGRAMS_SIZE = 1
-    # https://raw.githubusercontent.com/iampukar/toxic-comments-classification/master/train.csv
-    # "id","comment_text","toxic","severe_toxic","obscene","threat","insult","identity_hate"
     (x_train, y_train), (x_test, y_test), preproc = text.texts_from_csv(DATA_PATH,
                         'text',
                         label_columns = class_names,
@@ -56,15 +50,9 @@ def demo_doFastText(name='ljl'):
     for CORPUSNAME in corpusnames:
         
         DATA_PATH = os.path.join(os.getcwd(),'data',CORPUSNAME)+ '_hotvector.csv'
-        #DATA_PATH = os.getcwd()+'/gdrive/MyDrive/data/2022_readi/first-submission/'+ CORPUSNAME + '_hotvector.csv'
-        #DATA_PATH = os.getcwd()+'/gdrive/MyDrive/data/'+ corpusname + '.csv'
-        #DATA_PATH = corpusname + '_hotvector.csv'
-
-
-        #class_names =  get_labels(DATA_PATH)   
+ 
         class_names =  models.demo_get_csv_fieldnames(DATA_PATH)[2:]
         class_names_list.append(class_names)
-        #
         (x_train, y_train), (x_test, y_test), preproc, model, learner = demo_getFastText(DATA_PATH, class_names=class_names)
 
         # pseudo cross validation by running n times the train/validation
@@ -74,7 +62,6 @@ def demo_doFastText(name='ljl'):
         for RUN in range(number_of_run):
             print ('-------------------------------------------------------run', RUN)
             # train 
-            # {0.05, 0.1, 0.25, 0.5}
             #learner.autofit(0.00001)
             learner.autofit(0.0001)
             #learner.autofit(0.0007, 5)
@@ -114,14 +101,11 @@ def demo_doFastText(name='ljl'):
         print (header)
         print ('\t&'+'\t&'.join(line)+'\\\\')
 
-    return -1
+    return 0
 
 def demo_checkLR(name='ljl'):
     DATA_PATH = os.path.join(os.getcwd(),'data',name)+ '_hotvector.csv'
-    #DATA_PATH = os.getcwd()+'/gdrive/MyDrive/data/'+ corpusname + '.csv'
-    #DATA_PATH = corpusname + '_hotvector.csv'
-
-    #class_names =  get_labels(DATA_PATH)   
+  
     class_names =  models.demo_get_csv_fieldnames(DATA_PATH)[2:]
     print (class_names)    
 

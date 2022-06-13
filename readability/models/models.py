@@ -98,4 +98,3 @@ def demo_compute_evaluation_metrics(cm, round = -1, data_name = '', class_names=
     results['weighted_average_fmeasure'] = np.round(weighted_average_fmeasure, round)
         
   return results
-

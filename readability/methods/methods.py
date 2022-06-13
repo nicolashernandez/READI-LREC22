@@ -4,12 +4,9 @@ The methods module acts as an interface for Machine Learning applications (SVM/M
 It should be able to provide the following :
 Create the applications
 Customize/Tune the applications
-Using the applications
+Use the applications
 Export the results | Output visualisations
 """
-
-#Checklist :
-#Ignore this for now until the deep learning stuff is all ready
 import sklearn
 import pandas as pd
 import seaborn as sns

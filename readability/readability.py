@@ -18,16 +18,19 @@ from .models import bert, fasttext, models
 #     Remake structure to help differenciate between functions : ~ I think it's okay but I need some feedback
 #     Enable a way to "compile" in order to use underlying functions faster : ~ It's done, need to implement tests.
 #     Make sure code works both for texts (strings, or pre-tokenized texts) and corpus structure : ~ I think it works now.
-#     Add the methods related to machine learning or deep learning : X
+#     Add the methods related to machine learning or deep learning : V
 #     Add examples to the notebook to show how it can be used : ~ In progress.
-#     Add other measures that could be useful (Martinc Crossley): X
+#     Add other measures that could be useful (Martinc | Crossley): X
 #     Experiment further : X
 #     
 
 #10/06/22 checklist :
-# fix division by 0 error when encountering empty texts
-# convert demo_ functions into more user-friendly functions, with detailed documentation
-# figure out why some results are slightly off compared to what's in the paper
+# Convert demo_ functions into more user-friendly functions, with detailed documentation
+# Figure out why some results are slightly off for the ljl corpus compared to what's in the paper
+# Start implementing more measures / experiment
+
+# FIXME : several formulas are incorrect, as outlined in the submodule stats/common_scores.
+# For now, we kept these as is, in order to keep the paper's experiments reproducible
 
 
 # NOTE: There probably exists a better way to create an Statistics object as an attribute of Readability.
@@ -84,7 +87,7 @@ class Readability:
             self.nlp = None
         
         # Handling text that needs to be converted into lists of tokens
-        # NOTE: maybe remove punctuation by checking token.is_punct?
+        # NOTE: maybe allow removing punctuation by checking token.is_punct as a parameter
         if isinstance(content, str):
             self.content_type = "text"
             self.content = [[token.text for token in sent] for sent in self.nlp(content).sents]
@@ -205,7 +208,7 @@ class Readability:
         :return: a pandas dataframe (or a list of scores)
         :rtype: Union[pandas.core.frame.DataFrame,list] 
         """
-        #FIXME : Would be better to have this point to a scores_text() and scores_corpus(), which returns only one type.
+        #NOTE : Would be better to have this point to a scores_text() and scores_corpus(), which returns only one type.
         if self.content_type == "corpus":
             if hasattr(self, "corpus_statistics"):
                 return common_scores.traditional_scores(self.content, self.corpus_statistics)
@@ -219,6 +222,27 @@ class Readability:
                 values[score] = self.score(score)
             return values
 
+    def diversity(self, type, mode):
+        if type == "ttr":
+            func = diversity.type_token_ratio
+        elif type == "ntr":
+            func = diversity.noun_token_ratio
+
+        #TODO : if need special argument, make a kwargs or something or just a list of args brb
+        if self.content_type == "text":
+            return func(self.content, self.nlp, mode)
+        elif self.content_type == "corpus":
+            scores = {}
+            for level in self.classes:
+                scores[level] = []
+                for text in self.content[level]:
+                    scores[level].append(func(text, self.nlp, mode))
+            # Output part of the scores, first text for each class
+            for level in self.classes:
+                print("class", level, "text 0", "score" ,scores[level][0])
+            return scores
+        else:
+            return -1
 
     def compile(self):
         """
@@ -240,7 +264,8 @@ class Readability:
                 totalLongWords += len([token for token in sentence if len(token)>6])
                 totalCharacters += sum(len(token) for token in sentence)
                 totalSyllables += sum(utils.syllablesplit(word) for word in sentence)
-                nbPolysyllables += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
+                nbPolysyllables += sum(utils.syllablesplit(word) for word in sentence if utils.syllablesplit(word)>=3)
+                #nbPolysyllables += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
             self.statistics = Statistics()
             self.statistics.totalWords = totalWords
             self.statistics.totalLongWords = totalLongWords
@@ -268,7 +293,8 @@ class Readability:
                         totalLongWords += len([token for token in sentence if len(token)>6])
                         totalCharacters += sum(len(token) for token in sentence)
                         totalSyllables += sum(utils.syllablesplit(word) for word in sentence)
-                        nbPolysyllables += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
+                        nbPolysyllables += sum(utils.syllablesplit(word) for word in sentence if utils.syllablesplit(word)>=3)
+                        #nbPolysyllables += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
                     statistics = Statistics()
                     #TODO : make code less bloated by doing something like this : 
                     #for p in params:
@@ -322,7 +348,6 @@ class Readability:
             # Extract the classes from the dictionary's keys.
             corpus = self.content
             levels = self.classes
-            #TODO : Need to check that corpus is just a reference to self.content and not a copy, easier for coding, but might not be optimized
             cols = levels + ['total']
 
             # Build vocabulary
@@ -356,7 +381,7 @@ class Readability:
                 len_phr_moy=0
                 for text in corpus[level]:
                     nbr_ph+=len(text)
-                    temp_nbr_ph = len(text)
+                    temp_nbr_ph = min(len(text),1) # NOTE : not sure this is a good idea.
                     nbr_ph_moy+=len(text)/nb_txt
                     for sent in text:
                         nbr_tokens+=len(sent)

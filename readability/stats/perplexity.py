@@ -44,10 +44,8 @@ class PPPL_calculator:
     def PPPL_score(self,corpus,save = False):
         levels = list(corpus.keys())
         perplex = dict()
-        nb_tot = 0
         for level in levels:
             perplex[level] = []
-            ppl = 0
             for text in corpus[level]:
                 tex = ''
                 for sent in text:

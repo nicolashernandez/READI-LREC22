@@ -7,11 +7,9 @@ import os
 
 def demo_loadCorpusForTransformer(DATA_PATH, random_seed = 42):
   with open(DATA_PATH, 'r' ) as f:
-    #reader = csv.DictReader(f)
-    #x_train = [line['text'] for line in reader]
     csvreader = csv.reader(f)
     header = next(csvreader)
-    print (header)
+    print(header)
     lines = [line for line in csvreader]
     random.seed(random_seed)
     random.shuffle(lines)
@@ -26,11 +24,6 @@ def demo_loadCorpusForTransformer(DATA_PATH, random_seed = 42):
     y_train = y[:len_train]
     y_test = y[len_train:]
     return x_train, x_test, y_train, y_test
-    #for line in reader:
-            # line is { 'workers': 'w0', 'constant': 7.334, 'age': -1.406, ... }
-            # e.g. print( line[ 'workers' ] ) yields 'w0'
-    #      print(line)
-
 
 def demo_getTransformer(model_name, x_train, y_train, x_test, y_test, class_names, batch_size=6):
   t = text.Transformer(model_name, 
@@ -43,7 +36,6 @@ def demo_getTransformer(model_name, x_train, y_train, x_test, y_test, class_name
                       #ngram_range=NGRAMS_SIZE,
                      # preprocess_mode='bert' 
                      )
-#model = text.text_classifier('bert', (x_train, y_train) , preproc=preproc)
   trn = t.preprocess_train(x_train, y_train)
   val = t.preprocess_test(x_test, y_test)
   model = t.get_classifier() #     model (Model): A Keras Model instance
@@ -93,9 +85,6 @@ def demo_doBert(name='ljl'):
         
         for CORPUSNAME in corpusnames:
             DATA_PATH = os.path.join(os.getcwd(),'data',CORPUSNAME)+ '_hotvector.csv'
-            #DATA_PATH = os.getcwd()+'/gdrive/MyDrive/data/2022_readi/first-submission/'+ CORPUSNAME + '_hotvector.csv'
-            #DATA_PATH = os.getcwd()+'/gdrive/MyDrive/data/'+ corpusname + '.csv'
-            #DATA_PATH = corpusname + '_hotvector.csv'
 
             #class_names =  get_labels(DATA_PATH)   
             class_names =  models.demo_get_csv_fieldnames(DATA_PATH)[2:]
@@ -130,7 +119,6 @@ def demo_doBert(name='ljl'):
             for RUN in range(number_of_run):
                 print ('-------------------------------------------------------run', RUN)
                 # train 
-                # {0.05, 0.1, 0.25, 0.5}
                 #learner.autofit(0.00001)
                 learner.autofit(0.0001)
                 #learner.autofit(0.0007, 5)
