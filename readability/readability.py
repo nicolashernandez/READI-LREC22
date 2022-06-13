@@ -64,6 +64,7 @@ class Readability:
         """
         self.lang = lang
         self.perplexity_processor = perplexity_processor
+        self.perplexity_calculator = perplexity.pppl_calculator
 
 
         # Handle the NLP processor (mainly for tokenization in case we're given a text as a string)
@@ -274,8 +275,6 @@ class Readability:
             self.statistics.totalSyllables = totalSyllables
             self.statistics.nbPolysyllables = nbPolysyllables
             return self
-            
-
         elif self.content_type == "corpus":
             stats = {}
             for level in self.classes:
@@ -310,10 +309,48 @@ class Readability:
             return self
         return 0
 
+        
+    def perplexity(self):
+        """
+        Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
+        Please refer to this paper for more details : https://doi.org/10.18653%252Fv1%252F2020.acl-main.240
+
+        :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
+        :rtype: float or list(float)
+        """
+        if not hasattr(self.perplexity_calculator, "model_loaded"):
+            self.perplexity_calculator.load_model()
+            print("Model is now loaded")
+        print("Please be patient, pseudo-perplexity takes a lot of time to calculate.")
+        if self.content_type == "text":
+            return self.perplexity_calculator.PPPL_score_text(self.content)
+        elif self.content_type == "corpus":
+            return self.perplexity_calculator.PPPL_score(self.content)
+        return -1
+    
+    def remove_outliers(self,perplex_scores,stddev_ratio):
+        """
+        Outputs a corpus, after removing texts which are considered to be "outliers", based on a standard deviation ratio
+        A text is an outlier if its pseudo-perplexity value is lower or higher than this : mean +- standard_deviation * ratio
+        In order to exploit this new corpus, you'll need to make a new Readability instance.
+        For instance : new_r = Readability(r.remove_outliers(r.perplexity(),1))
+
+        :return: a corpus, in a specific format where texts are represented as lists of sentences, which are lists of words.
+        :rtype: dict[class][text][sentence][token]
+        """
+        if not hasattr(self.perplexity_calculator, "model_loaded"):
+            self.perplexity_calculator.load_model()
+            print("Model is now loaded")
+        if self.content_type == "text":
+            raise TypeError('Content type is not corpus, please load something else to use this function.')
+        elif self.content_type == "corpus":
+            return self.perplexity_calculator.remove_outliers(self.content,perplex_scores,stddev_ratio)
+        return -1
+
     def stats(self):
         """
         Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.
-        In this case, this will output the statistics for the first ten texts for every class
+        In this case, this will output the statistics for the first text for every class
         """
         if hasattr(self, "statistics"):
             for stat in self.statistics.__dict__:
