@@ -3,6 +3,7 @@ Currently it's only the text token ratio and noun-only version.
 These ratios can have variants which can be selected by changing the mode parameter.
 For instance, mode == "root" will square the denominator of the ratio, and is supposed to be more robust for longer texts.
 """
+import math
 import string
 
 
@@ -37,14 +38,18 @@ def type_token_ratio(text, nlp = None, mode = None):
     #TODO : handle what happens if we receive an empty text as input => nb_unique / tokens = 0
     #Maybe warn the user and send an unusable ratio, such as two? I suppose. 
 
-    #FIXME : make this an exception instead
     if nb_tokens == 0:
         print("WARNING : Current text's content is empty, return value has been set to -1")
         return -1
 
-    if mode == "root":
-        #print("DEBUG: Returning Root TTR ratio = ",nb_unique,"/",nb_tokens**2,":",nb_unique/nb_tokens**2)
-        return(nb_unique/nb_tokens**2)
+    if mode == "corrected":
+        #print("DEBUG: Returning Corrected TTR ratio = ",nb_unique,"/",math.sqrt(2*nb_tokens),":",nb_unique/math.sqrt(2*nb_tokens))
+        return(nb_unique/math.sqrt(2*nb_tokens))
+    
+    elif mode == "root":
+        #print("DEBUG: Returning Root TTR ratio = ",nb_unique,"/",mqth.sqrt(nb_tokens),":",nb_unique/math.sqrt(nb_tokens))
+        return(nb_unique/math.sqrt(nb_tokens))
+    
     else:
         #print("DEBUG: Returning TTR ratio = ",nb_unique,"/",nb_tokens,":",nb_unique/nb_tokens)
         return(nb_unique/nb_tokens)
@@ -78,15 +83,19 @@ def noun_token_ratio(text,nlp=None, mode = None):
     nb_unique = len(Counter(nouns))
     nb_tokens = len(nouns)
 
-    #FIXME : make this an exception instead
     if nb_tokens == 0:
         print("WARNING : Current text's content is empty or no nouns have been recognized, return value has been set to -1")
         return -1
 
-    if mode == "root":
-        #print("DEBUG: Returning Root NTR ratio = ",nb_unique,"/",nb_tokens**2,":",nb_unique/nb_tokens**2)
-        return(nb_unique/nb_tokens**2)
+    if mode == "corrected":
+        #print("DEBUG: Returning Corrected TTR ratio = ",nb_unique,"/",math.sqrt(2*nb_tokens),":",nb_unique/math.sqrt(2*nb_tokens))
+        return(nb_unique/math.sqrt(2*nb_tokens))
+    
+    elif mode == "root":
+        #print("DEBUG: Returning Root TTR ratio = ",nb_unique,"/",mqth.sqrt(nb_tokens),":",nb_unique/math.sqrt(nb_tokens))
+        return(nb_unique/math.sqrt(nb_tokens))
+    
     else:
-        #print("DEBUG: Returning NTR ratio = ",nb_unique,"/",nb_tokens,":",nb_unique/nb_tokens)
+        #print("DEBUG: Returning TTR ratio = ",nb_unique,"/",nb_tokens,":",nb_unique/nb_tokens)
         return(nb_unique/nb_tokens)
     

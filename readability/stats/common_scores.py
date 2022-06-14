@@ -165,7 +165,6 @@ def traditional_scores(corpus, statistics=None):
     Outputs a pandas dataframe containing the mean scores for various traditional readability measures.
     :param corpus: Dictionary of lists of sentences (represented as a list of tokens)
     :type corpus: dict[class][text][sentence][token]
-
     :return: a pandas dataframe 
     :rtype: pandas.core.frame.DataFrame
     """

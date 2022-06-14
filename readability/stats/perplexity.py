@@ -64,7 +64,12 @@ class PPPL_calculator:
         A text is an outlier if its pseudo-perplexity value is lower or higher than this : mean +- standard_deviation * ratio
         In order to exploit this new corpus, you'll need to make a new Readability instance.
         For instance : new_r = Readability(r.remove_outliers(r.perplexity(),1))
-
+        :param corpus: Dictionary of lists of sentences (represented as a list of tokens)
+        :type corpus: dict[class][text][sentence][token]
+        :param perplex: Pseudo-perplexity values stored in a format similar to corpus
+        :type perplex: dict[class][value]
+        :param stddevratio: How much should a score deviate from (mean +- standard deviation * ratio)
+        :type stddevratio: float
         :return: a corpus, in a specific format where texts are represented as lists of sentences, which are lists of words.
         :rtype: dict[class][text][sentence][token]
         """

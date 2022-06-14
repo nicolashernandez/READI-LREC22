@@ -5,51 +5,56 @@ import ktrain
 from ktrain import text
 import os
 
-def demo_loadCorpusForTransformer(DATA_PATH, random_seed = 42):
-  with open(DATA_PATH, 'r' ) as f:
-    csvreader = csv.reader(f)
-    header = next(csvreader)
-    print(header)
-    lines = [line for line in csvreader]
-    random.seed(random_seed)
-    random.shuffle(lines)
-    x = [line[1] for line in lines]
-    y = [[int(x) for x in line[2:len(line)]] for line in lines]
-  
-    percent_train = 90
-    len_train = round(len(lines)/100* percent_train)
-    print ('len_train', len_train) 
-    x_train = x[:len_train]
-    x_test = x[len_train:]
-    y_train = y[:len_train]
-    y_test = y[len_train:]
-    return x_train, x_test, y_train, y_test
+def demo_loadCorpusForTransformer(DATA_PATH, random_seed = 42, percent_train = 90):
+    """Loads a csv file, and splits it into a train/test subset."""
+    with open(DATA_PATH, 'r' ) as f:
+        csvreader = csv.reader(f)
+        header = next(csvreader)
+        lines = [line for line in csvreader]
+        random.seed(random_seed)
+        random.shuffle(lines)
+        x = [line[1] for line in lines]
+        y = [[int(x) for x in line[2:len(line)]] for line in lines]
+        len_train = round(len(lines)/100* percent_train)
+        print ('len_train', len_train) 
+        x_train = x[:len_train]
+        x_test = x[len_train:]
+        y_train = y[:len_train]
+        y_test = y[len_train:]
+        return x_train, x_test, y_train, y_test
 
 def demo_getTransformer(model_name, x_train, y_train, x_test, y_test, class_names, batch_size=6):
-  t = text.Transformer(model_name, 
-                     #maxlen=500, 
-                     class_names=class_names #,
-                     #label_columns = class_names,
-                     #val_filepath=None, # if None, 10% of data will be used for validation
-                      ##max_features=NUM_WORDS, 
-                      #maxlen=MAXLEN,
-                      #ngram_range=NGRAMS_SIZE,
-                     # preprocess_mode='bert' 
-                     )
-  trn = t.preprocess_train(x_train, y_train)
-  val = t.preprocess_test(x_test, y_test)
-  model = t.get_classifier() #     model (Model): A Keras Model instance
-  learner = ktrain.get_learner(model, train_data=trn, val_data=val, batch_size=batch_size)
-  print ('t',type(t), 
-      '\ntrn', type(trn), 
-      '\nval', type(val), 
-      '\nmodel', type(model), 
-      '\nlearner', type(learner))
-  print (model.summary())
-  return t, trn, val, model, learner
+    """Uses the ktrain library to load a BERT model, then creates a learner object based on data split into train/test"""
+    t = text.Transformer(model_name, 
+                        #maxlen=500, 
+                        class_names=class_names #,
+                        #label_columns = class_names,
+                        #val_filepath=None, # if None, 10% of data will be used for validation
+                        ##max_features=NUM_WORDS, 
+                        #maxlen=MAXLEN,
+                        #ngram_range=NGRAMS_SIZE,
+                        #preprocess_mode='bert' 
+                        )
+    trn = t.preprocess_train(x_train, y_train)
+    val = t.preprocess_test(x_test, y_test)
+    model = t.get_classifier() #model (Model): A Keras Model instance
+    learner = ktrain.get_learner(model, train_data=trn, val_data=val, batch_size=batch_size)
+    #print ('t',type(t), 
+    #    '\ntrn', type(trn), 
+    #    '\nval', type(val), 
+    #    '\nmodel', type(model), 
+    #    '\nlearner', type(learner))
+    #print (model.summary())
+    return t, trn, val, model, learner
 
-
-def demo_doBert(name='ljl'):
+def demo_doBert(name='ljl',test_flag = False):
+    """Imports, configures, and trains the BERT model used in our paper.
+    This method also prints the results in a latex-usable format, within the tabular tag.
+    :param name: Which corpus data to use for reproducing resultsn can be "ljl","bibebook.com","JeLisLibre", or "all"
+    :type name: str
+    :return: Nothing, it just prints the execution trace and a latex-usable table
+    :rtype: None
+    """
     #MODEL_NAME = 'distilbert-base-uncased'
     #MODEL_NAME = 'camembert-base'# https://huggingface.co/camembert-base ; https://camembert-model.fr/
     #MODEL_NAME = 'flaubert/flaubert_base_cased' # https://huggingface.co/flaubert/flaubert_base_cased
@@ -69,7 +74,6 @@ def demo_doBert(name='ljl'):
     elif name != "ljl":
         raise ValueError("Please provide one of the following parameters instead : 'ljl', 'bibebook.com', 'JeLisLibre', or 'all'")
 
-
     #model_names = ['bert-base-multilingual-cased', 'camembert-base', 'flaubert/flaubert_base_cased'] #]
     model_names = ['camembert-base' ] #]
 
@@ -79,14 +83,12 @@ def demo_doBert(name='ljl'):
 
     for MODEL_NAME in model_names:
         print ('-------------------------------------------------------------------')
-
         results_summary = list()
         class_names_list = list()
         
         for CORPUSNAME in corpusnames:
             DATA_PATH = os.path.join(os.getcwd(),'data',CORPUSNAME)+ '_hotvector.csv'
 
-            #class_names =  get_labels(DATA_PATH)   
             class_names =  models.demo_get_csv_fieldnames(DATA_PATH)[2:]
             class_names_list.append(class_names)
 
@@ -113,11 +115,17 @@ def demo_doBert(name='ljl'):
                 learner.validate(class_names=t.get_classes())
 
             # PSEUDO CROSS VALIDATION by running n times the train/validation
-            
             results = list()
+            if test_flag:
+                init_weights = []
+                for layer in learner.model.layers:
+                    init_weights.append(layer.get_weights()) # list of numpy arrays
 
             for RUN in range(number_of_run):
                 print ('-------------------------------------------------------run', RUN)
+                if test_flag:
+                    for index in range(len(init_weights)):
+                        learner.model.layers[index].set_weight(init_weights[index])
                 # train 
                 #learner.autofit(0.00001)
                 learner.autofit(0.0001)
@@ -141,6 +149,7 @@ def demo_doBert(name='ljl'):
             print ('CORPUSNAME', corpusnames[i], 'CORPUSNAME', corpusnames[i])
             r = models.demo_compute_evaluation_metrics(results_summary[i],round=2, data_name=corpusnames[i], class_names=class_names_list[i])
             models.pp.pprint(r)
+            print()
 
             multicol_list = list()
             for j in range(len(class_names_list[i])):

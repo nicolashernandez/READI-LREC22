@@ -31,7 +31,8 @@ from sklearn import metrics
 def demo_dummy_fun(doc):
     return doc
 
-def demo_convert_corpus_to_list(corpus):
+def convert_corpus_to_list(corpus):
+    """Converts a dict[class][text][sentence][token] structure into list(str)"""
     corpus_as_list=list()
     labels_split = list()
     for level in corpus.keys():
@@ -53,7 +54,7 @@ def demo_doMethods(corpus, plot=False):
         min_df=2)
 
     # do vectorization
-    temp_structure = demo_convert_corpus_to_list(corpus)
+    temp_structure = convert_corpus_to_list(corpus)
     corpus_as_list = temp_structure[0]
     tfidf_matrix = tfidf_vectorizer.fit_transform(corpus_as_list)
     labels_split = temp_structure[1]
@@ -68,31 +69,6 @@ def demo_doMethods(corpus, plot=False):
     #oops, get_feature_names_out is a feature of scikit above 1.0.0, except ktrain forces to download scikit 0.24.
     #let's see if this gives similar enough results..
     pd.DataFrame(tfidf_matrix, columns=tfidf_vectorizer.get_feature_names())
-
-    #prep/do models
-    #models = [
-    #RandomForestClassifier(n_estimators=200, max_depth=3, random_state=0),
-    #LinearSVC(class_weight='balanced', random_state=0),
-    #MultinomialNB(),
-    #LogisticRegression(random_state=0), MLPClassifier(random_state=0)
-    #]
-    #CV = 5
-    #cv_df = pd.DataFrame(index=range(CV * len(models)))
-    #entries = []
-    #for model in models:
-    #    model_name = model.__class__.__name__
-    #    accuracies = cross_val_score(model, tfidf_matrix, labels_split, scoring='accuracy', cv=CV)
-    #    for fold_idx, accuracy in enumerate(accuracies):
-    #        entries.append((model_name, fold_idx, accuracy))
-    #cv_df = pd.DataFrame(entries, columns=['model_name', 'fold_idx', 'accuracy'])
-    #if plot:
-    #    sns.boxplot(x='model_name', y='accuracy', data=cv_df)
-    #    sns.stripplot(x='model_name', y='accuracy', data=cv_df, 
-    #                size=8, jitter=True, edgecolor="gray", linewidth=2)
-    #    plt.show()
-
-    ## show diff model general results output results
-    #print(cv_df.groupby('model_name').accuracy.mean())
 
     # show detailed results for mlp
     print("MLP RESULTS")
@@ -129,7 +105,6 @@ def demo_doMethods(corpus, plot=False):
         plt.xlabel('Actuals')
         plt.show()
     
-    
     print(metrics.classification_report(y, y_pred, target_names=corpus.keys()))
 
 
@@ -143,9 +118,35 @@ def demo_doMethods(corpus, plot=False):
 #Configuration :
 
 
-#Using a specific model
+#Using a specific model :
 
 
 
-#Using multiple models
+#Using multiple models :
 
+def stub_modelComparer():
+    #prep/do models
+    #models = [
+    #RandomForestClassifier(n_estimators=200, max_depth=3, random_state=0),
+    #LinearSVC(class_weight='balanced', random_state=0),
+    #MultinomialNB(),
+    #LogisticRegression(random_state=0), MLPClassifier(random_state=0)
+    #]
+    #CV = 5
+    #cv_df = pd.DataFrame(index=range(CV * len(models)))
+    #entries = []
+    #for model in models:
+    #    model_name = model.__class__.__name__
+    #    accuracies = cross_val_score(model, tfidf_matrix, labels_split, scoring='accuracy', cv=CV)
+    #    for fold_idx, accuracy in enumerate(accuracies):
+    #        entries.append((model_name, fold_idx, accuracy))
+    #cv_df = pd.DataFrame(entries, columns=['model_name', 'fold_idx', 'accuracy'])
+    #if plot:
+    #    sns.boxplot(x='model_name', y='accuracy', data=cv_df)
+    #    sns.stripplot(x='model_name', y='accuracy', data=cv_df, 
+    #                size=8, jitter=True, edgecolor="gray", linewidth=2)
+    #    plt.show()
+
+    ## show diff model general results output results
+    #print(cv_df.groupby('model_name').accuracy.mean())
+    return -1

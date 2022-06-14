@@ -29,6 +29,31 @@ from .models import bert, fasttext, models
 # Figure out why some results are slightly off for the ljl corpus compared to what's in the paper
 # Start implementing more measures / experiment
 
+# Things in Martinc's article :
+
+# Discourse cohesion features :
+# Coherence ~~ is text more than collection if unrelated sentences
+# Cohesion : text represented by explicit formal grammatical ties aka how are parts related to each other
+# Cohesion => co-reference, anaphoric chains, entity density and cohesion features, lexical cohesion measures,
+# and POS tag-based cohesion measures.
+# Clarification : Entity cohesion ~~ relative freq of possible transtions between syntactic functions played by same entity in adjacent sentences
+# Lexical cohesion ~ features like frequency of content word repetition (adjacent), Latent Semantic Analysis for similariyu,
+# Lexical Tightness for mean value of Positiv Normalized Pointwise Mutual Information for all pairs of content-word tokens in text
+# POS tag-based is measuring the ratio of pronoun and article parts-of-speech
+# Todirascu analyzed 65 discourse features, but found that they don't contribute much compared to traditional or simple formulas,
+# but we can try to make them available in the lib.
+
+# Lexico-semantic features :
+# ~ Difficulty of vac in text, like TTR/RTTR/CTTR (need to include that one)
+# need to find something about yule's k it seems to be used sometimes
+#brb need to fix ttr
+
+# Things in Crossley's article :
+#
+# Things in Yancey's article : 
+#
+
+
 # FIXME : several formulas are incorrect, as outlined in the submodule stats/common_scores.
 # For now, we kept these as is, in order to keep the paper's experiments reproducible
 
@@ -40,7 +65,7 @@ class Statistics:
 class Readability:
     """
     The Readability class provides a way to access the underlying library modules in order to help estimate the complexity of any given text
-    List of methods : __init__, corpus_info, compile, stats, score(score_name), scores
+    List of methods : __init__, corpus_info, compile, stats, score(score_name), scores, perplexity, remove_outliers, diversity(type,mode)
     List of attributes : content, content_type, lang, nlp, perplexity_processor, classes, statistics, corpus_statistics
 
     In its current state, scores are meant to be used with the French language, but this can change in the future.
@@ -229,7 +254,6 @@ class Readability:
         elif type == "ntr":
             func = diversity.noun_token_ratio
 
-        #TODO : if need special argument, make a kwargs or something or just a list of args brb
         if self.content_type == "text":
             return func(self.content, self.nlp, mode)
         elif self.content_type == "corpus":
@@ -245,11 +269,47 @@ class Readability:
         else:
             return -1
 
+    def perplexity(self):
+        """
+        Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
+        Please refer to this paper for more details : https://doi.org/10.18653%252Fv1%252F2020.acl-main.240
+
+        :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
+        :rtype: float or list(float)
+        """
+        if not hasattr(self.perplexity_calculator, "model_loaded"):
+            self.perplexity_calculator.load_model()
+            print("Model is now loaded")
+        print("Please be patient, pseudo-perplexity takes a lot of time to calculate.")
+        if self.content_type == "text":
+            return self.perplexity_calculator.PPPL_score_text(self.content)
+        elif self.content_type == "corpus":
+            return self.perplexity_calculator.PPPL_score(self.content)
+        return -1
+    
+    def remove_outliers(self,perplex_scores,stddev_ratio):
+        """
+        Outputs a corpus, after removing texts which are considered to be "outliers", based on a standard deviation ratio
+        A text is an outlier if its pseudo-perplexity value is lower or higher than this : mean +- standard_deviation * ratio
+        In order to exploit this new corpus, you'll need to make a new Readability instance.
+        For instance : new_r = Readability(r.remove_outliers(r.perplexity(),1))
+
+        :return: a corpus, in a specific format where texts are represented as lists of sentences, which are lists of words.
+        :rtype: dict[class][text][sentence][token]
+        """
+        if not hasattr(self.perplexity_calculator, "model_loaded"):
+            self.perplexity_calculator.load_model()
+            print("Model is now loaded")
+        if self.content_type == "text":
+            raise TypeError('Content type is not corpus, please load something else to use this function.')
+        elif self.content_type == "corpus":
+            return self.perplexity_calculator.remove_outliers(self.content,perplex_scores,stddev_ratio)
+        return -1
+
     def compile(self):
         """
         Calculates a bunch of statistics to make some underlying functions faster.
-        Simply do X = X.compile()
-        This returns a copy of a Readability instance, supplemented with a "statistics" or "corpus_statistics" attribute that can be used for other functions.
+        Returns a copy of a Readability instance, supplemented with a "statistics" or "corpus_statistics" attribute that can be used for other functions.
         """
         #TODO : debloat this and/or refactor it since we copy-paste almost the same below
         if self.content_type == "text":
@@ -309,44 +369,6 @@ class Readability:
             return self
         return 0
 
-        
-    def perplexity(self):
-        """
-        Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
-        Please refer to this paper for more details : https://doi.org/10.18653%252Fv1%252F2020.acl-main.240
-
-        :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
-        :rtype: float or list(float)
-        """
-        if not hasattr(self.perplexity_calculator, "model_loaded"):
-            self.perplexity_calculator.load_model()
-            print("Model is now loaded")
-        print("Please be patient, pseudo-perplexity takes a lot of time to calculate.")
-        if self.content_type == "text":
-            return self.perplexity_calculator.PPPL_score_text(self.content)
-        elif self.content_type == "corpus":
-            return self.perplexity_calculator.PPPL_score(self.content)
-        return -1
-    
-    def remove_outliers(self,perplex_scores,stddev_ratio):
-        """
-        Outputs a corpus, after removing texts which are considered to be "outliers", based on a standard deviation ratio
-        A text is an outlier if its pseudo-perplexity value is lower or higher than this : mean +- standard_deviation * ratio
-        In order to exploit this new corpus, you'll need to make a new Readability instance.
-        For instance : new_r = Readability(r.remove_outliers(r.perplexity(),1))
-
-        :return: a corpus, in a specific format where texts are represented as lists of sentences, which are lists of words.
-        :rtype: dict[class][text][sentence][token]
-        """
-        if not hasattr(self.perplexity_calculator, "model_loaded"):
-            self.perplexity_calculator.load_model()
-            print("Model is now loaded")
-        if self.content_type == "text":
-            raise TypeError('Content type is not corpus, please load something else to use this function.')
-        elif self.content_type == "corpus":
-            return self.perplexity_calculator.remove_outliers(self.content,perplex_scores,stddev_ratio)
-        return -1
-
     def stats(self):
         """
         Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.
@@ -377,10 +399,8 @@ class Readability:
         :return: a pandas dataframe 
         :rtype: pandas.core.frame.DataFrame
         """
-        #TODO : make that an exception instead?
         if self.content_type != "corpus":
-            print("Current input isn't recognized as a corpus. Please provide a dictionary with the following format : dict[class][text][sentence][token]")
-            return 0
+            raise TypeError("Current type is not recognized as corpus. Please provide a dictionary with the following format : dict[class][text][sentence][token]")
         else:
             # Extract the classes from the dictionary's keys.
             corpus = self.content

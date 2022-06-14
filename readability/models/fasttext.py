@@ -6,6 +6,7 @@ from ktrain import text
 from csv import DictReader
 
 def demo_getFastText(DATA_PATH, class_names):
+    """Uses the ktrain library to load the fastText model, then creates a learner object based on data split into train/test"""
     NUM_WORDS = 50000
     MAXLEN = 150
     #NGRAMS_SIZE = 1 # 8 minutes avec 2
@@ -33,7 +34,14 @@ def demo_getFastText(DATA_PATH, class_names):
 
 
 
-def demo_doFastText(name='ljl'):
+def demo_doFastText(name='ljl',test_flag = False):
+    """Imports, configures, and trains the fastText model used in our paper.
+    This method also prints the results in a latex-usable format, within the tabular tag.
+    :param name: Which corpus data to use for reproducing resultsn can be "ljl","bibebook.com","JeLisLibre", or "all"
+    :type name: str
+    :return: Nothing, it just prints the execution trace and a latex-usable table
+    :rtype: None
+    """
     corpusnames = ['ljl']
     if name == 'all':
         corpusnames = ['ljl', 'bibebook.com', 'JeLisLibre']
@@ -59,8 +67,16 @@ def demo_doFastText(name='ljl'):
         number_of_run = 5
         results = list()
 
+        if test_flag:
+            init_weights = []
+            for layer in learner.model.layers:
+                init_weights.append(layer.get_weights()) # list of numpy arrays
+
         for RUN in range(number_of_run):
             print ('-------------------------------------------------------run', RUN)
+            if test_flag:
+                for index in range(len(init_weights)):
+                    learner.model.layers[index].set_weight(init_weights[index])
             # train 
             #learner.autofit(0.00001)
             learner.autofit(0.0001)
@@ -100,6 +116,7 @@ def demo_doFastText(name='ljl'):
         print (multicol)
         print (header)
         print ('\t&'+'\t&'.join(line)+'\\\\')
+        print()
 
     return 0
 
