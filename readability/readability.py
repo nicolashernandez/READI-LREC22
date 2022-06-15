@@ -29,29 +29,6 @@ from .models import bert, fasttext, models
 # Figure out why some results are slightly off for the ljl corpus compared to what's in the paper
 # Start implementing more measures / experiment
 
-# Things in Martinc's article :
-
-# Discourse cohesion features :
-# Coherence ~~ is text more than collection if unrelated sentences
-# Cohesion : text represented by explicit formal grammatical ties aka how are parts related to each other
-# Cohesion => co-reference, anaphoric chains, entity density and cohesion features, lexical cohesion measures,
-# and POS tag-based cohesion measures.
-# Clarification : Entity cohesion ~~ relative freq of possible transtions between syntactic functions played by same entity in adjacent sentences
-# Lexical cohesion ~ features like frequency of content word repetition (adjacent), Latent Semantic Analysis for similariyu,
-# Lexical Tightness for mean value of Positiv Normalized Pointwise Mutual Information for all pairs of content-word tokens in text
-# POS tag-based is measuring the ratio of pronoun and article parts-of-speech
-# Todirascu analyzed 65 discourse features, but found that they don't contribute much compared to traditional or simple formulas,
-# but we can try to make them available in the lib.
-
-# Lexico-semantic features :
-# ~ Difficulty of vac in text, like TTR/RTTR/CTTR (need to include that one)
-# need to find something about yule's k it seems to be used sometimes
-#brb need to fix ttr
-
-# Things in Crossley's article :
-#
-# Things in Yancey's article : 
-#
 
 
 # FIXME : several formulas are incorrect, as outlined in the submodule stats/common_scores.
@@ -154,7 +131,7 @@ class Readability:
                             self.content_type = "corpus"
                             self.content = content
                             self.classes = list(content.keys())
-            #else, check if the structure is dict[string] and tokenize everything (warn user it'll take some time)
+            #else, check if the structure is dict[class][text].. and tokenize everything (warn user it'll take some time)
             #and then use that as the new structure
 
     def score(self, name):
@@ -367,7 +344,7 @@ class Readability:
                     stats[level].append(statistics)
             self.corpus_statistics = stats
             return self
-        return 0
+        return -1
 
     def stats(self):
         """

@@ -6,6 +6,14 @@ For instance, mode == "root" will square the denominator of the ratio, and is su
 import math
 import string
 
+# Lexico-semantic features :
+# ~ Difficulty of voc in text, like TTR/RTTR/CTTR.
+# need to find something about yule's k it seems to be used sometimes, but what does it mean?
+# Other stuff : n-gram lexical features, like word or character n-grams.
+# POS based lexical features (i.e ttr but with nouns or other stuff)
+# Can also do density (percentage of content words and function words)
+# Also need to do word-list based features, 
+
 
 # The following measures are for text diversity:
 def type_token_ratio(text, nlp = None, mode = None):
@@ -14,7 +22,7 @@ def type_token_ratio(text, nlp = None, mode = None):
 
     :param str text: Content of a text, converted to string if it's already a list of tokens
     :param str mode: Which version of the ttr to return
-    :return: text token ratio, possibly the root version.
+    :return: text token ratio, mode can be "root", "corrected", and defaults to standard (TTR)
     :rtype: float
     """
     from collections import Counter
@@ -63,7 +71,7 @@ def noun_token_ratio(text,nlp=None, mode = None):
     :param nlp: What natural language processor to use, currently only spacy is supported.
     :type nlp: spacy.lang
     :param str mode: Which version of the ttr to return
-    :return: noun token ratio, possibly the root version.
+    :return: noun token ratio, mode can be "root", "corrected", and defaults to standard (TTR)
     :rtype: float
     """
     from collections import Counter
