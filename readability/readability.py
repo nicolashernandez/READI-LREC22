@@ -10,7 +10,7 @@ It can be customized based on which NLP processor to use, or what language to ev
 import pandas as pd
 import spacy
 import utils
-from .stats import diversity, perplexity, common_scores
+from .stats import diversity, perplexity, common_scores, word_list_based, syntactic, discourse, rsrs
 from .methods import methods
 from .models import bert, fasttext, models
 
@@ -91,6 +91,7 @@ class Readability:
         
         # Handling text that needs to be converted into lists of tokens
         # NOTE: maybe allow removing punctuation by checking token.is_punct as a parameter
+        # TODO: make a "convert_text_to_lists" function in utils
         if isinstance(content, str):
             self.content_type = "text"
             self.content = [[token.text for token in sent] for sent in self.nlp(content).sents]

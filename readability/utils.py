@@ -66,3 +66,17 @@ def syllablesplit(input):
 #                prev_is_syl = True
 #                break
 #    return(nb_syllabes)
+
+
+def convert_text_to_string(text):
+    if isinstance(text, str):
+        doc = text
+
+    elif any(isinstance(el, list) for el in text):
+        doc = ''
+        for sentence in text:
+            doc = doc + ' ' + ' '.join(sentence)
+        
+    elif isinstance(text, list):
+        doc = ' '.join(text)
+    return doc
