@@ -1,4 +1,4 @@
-"""Might need to make a "word_list_based" folder instead and differenciate between types of features."""
+"""Might need to make a "word_list_based" folder instead and differenciate between types of features / data sources used"""
 
 import os
 import pandas as pd
@@ -6,17 +6,56 @@ from .. import utils
 from collections import Counter
 # Cognitive features :
 # 1. Proportion of abstract and concrete words :
-# Les Voisins de Le Monde lexical database, can derive 3 vars, prop abstract, prop concrete, texte coverage of list
+# Les Voisins de Le Monde lexical database, can derive 3 vars, prop abstract, prop concrete, text coverage of list
 # Goriachun, D. & N. Gala (2020). Identifying abstract and concrete words in French
 # to better address reading difficulties. In E.L.R. Association (ed.) Proceedings
 # of the 1st Workshop on Tools and Resources to Empower People with REAding
 # DIfficulties (READI). Marseille, France, 33–40.
+# [...]  Besides, the final list, a resource per se in French available on demand, 
+# TODO : send them a mail to acquire this list of 7,898 abstract or concrete nouns.
 
 # 2. Avg OLD20(Orthographic Levenshtein Distance) / PLD20(Phonological Levenshtein distance) per word 
 # = Average distance of 20 closest words found in lexicon, or closest phonemes.
 # Can be found on the 125,623 entries of the Lexique 3.6 database.
-# 3. Avg number of commonly known senses per word aka polysemy
 
+lexique_df = None
+def import_lexique_dataframe():
+    global lexique_df
+    if not isinstance(dubois_df,pd.DataFrame):
+        print("lexique dataframe imported")
+        DATA_PATH = os.path.join(os.getcwd(),'data','lexique','Lexique383.tsv')
+        df=pd.read_csv(DATA_PATH, sep = '\t')
+        lexique_df = df
+        return df
+    else:
+        print("lexique dataframe already imported")
+        return lexique_df
+
+def stub_lexique(text, nlp = None):
+    df = import_lexique_dataframe()
+    text = utils.convert_text_to_string(text)
+    # Two ways to approach this :
+    # 1) Use a pre-existing lexicon to check old and hope our words appear there..
+    # 2) calculate the Levenshtein distances "on the fly" based on only the words int he current corpus
+    # First way is faster to implement, but the second way is relevant due to returning a different feature.
+    # Both of the average values for each word in a text could be similar, we'll find out.
+    # With the second way, maybe we could make a ratio of "words that don't have close neighbours" but
+    # I think that will be very correlated with text diversity in the first place so maybe not a lot of interest.
+
+    # Converting each recognized noun in text to its lemma in lowercase, in order to check if there's a match
+    # First ignore everything that isn't a lemma to reduce the dataset size : We are now getting 47k words out of 142k
+    df = df.loc[df['islem'] == 1]
+    # Remove duplicate values : down to 45k words
+    df = df.drop_duplicates(subset="lemme")
+    # Keep only relevant columns for now : From 35 columns to 3.
+    df = df[['lemme','old20','pld20']]
+    DATA_PATH = os.path.join(os.getcwd(),'data','lexique','Lexique383_slim.tsv')
+    df.to_csv(DATA_PATH,sep = "\t", index=False)
+    print("saved slimmer lexique in data/lexique/")
+    return 0
+
+
+# 3. Avg number of commonly known senses per word aka polysemy
 # There apparently exists a list of 23,342 annotated French words, done by francois et al 2016
 # Pedagogical features :
 # variables designed from official Reference Level Descriptors for French (Beacco et al 2008)
@@ -36,7 +75,7 @@ from collections import Counter
 # cycle indicates the placement of a word within the five three-year cycles, although the fifth one only contains the first year.
 
 dubois_df = None
-# Helper functions
+
 def import_dubois_dataframe():
     global dubois_df
     if not isinstance(dubois_df,pd.DataFrame):
