@@ -32,6 +32,7 @@ from .models import bert, fasttext, models
 
 
 # FIXME : several formulas are incorrect, as outlined in the submodule stats/common_scores.
+# These being GFI, ARI due to wrong formulas, SMOG due to an error in calculating polysyllables, FRE due to a wrong variable assignation.
 # For now, we kept these as is, in order to keep the paper's experiments reproducible
 
 
@@ -226,27 +227,6 @@ class Readability:
                 values[score] = self.score(score)
             return values
 
-    def diversity(self, type, mode):
-        if type == "ttr":
-            func = diversity.type_token_ratio
-        elif type == "ntr":
-            func = diversity.noun_token_ratio
-
-        if self.content_type == "text":
-            return func(self.content, self.nlp, mode)
-        elif self.content_type == "corpus":
-            scores = {}
-            for level in self.classes:
-                scores[level] = []
-                for text in self.content[level]:
-                    scores[level].append(func(text, self.nlp, mode))
-            # Output part of the scores, first text for each class
-            for level in self.classes:
-                print("class", level, "text 0", "score" ,scores[level][0])
-            return scores
-        else:
-            return -1
-
     def perplexity(self):
         """
         Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
@@ -277,12 +257,43 @@ class Readability:
         """
         if not hasattr(self.perplexity_calculator, "model_loaded"):
             self.perplexity_calculator.load_model()
-            print("Model is now loaded")
+            print("Model for calculating perplexity is now loaded")
         if self.content_type == "text":
             raise TypeError('Content type is not corpus, please load something else to use this function.')
         elif self.content_type == "corpus":
             return self.perplexity_calculator.remove_outliers(self.content,perplex_scores,stddev_ratio)
         return -1
+
+    def diversity(self, type, mode):
+        """TODO: explain what the arguments represent, type is which ratio to use : ttr, ntr..,
+        mode is which version of the formula : normal, root, corrected...
+        """
+        if type == "ttr":
+            func = diversity.type_token_ratio
+        elif type == "ntr":
+            func = diversity.noun_token_ratio
+
+        if self.content_type == "text":
+            return func(self.content, self.nlp, mode)
+        elif self.content_type == "corpus":
+            scores = {}
+            for level in self.classes:
+                scores[level] = []
+                for text in self.content[level]:
+                    scores[level].append(func(text, self.nlp, mode))
+            # Output part of the scores, first text for each class
+            # NOTE : maybe output mean scores for each class instead.
+            for level in self.classes:
+                print("class", level, "text 0", "score" ,scores[level][0])
+            return scores
+        else:
+            return -1
+
+    
+    def dubois_proportion(self,type = "total", filter = None):
+        func = word_list_based.dubois_proportion
+        return func(self.content,self.nlp,type,filter)
+
 
     def compile(self):
         """
@@ -356,7 +367,7 @@ class Readability:
             for stat in self.statistics.__dict__:
                 print(stat, "=", self.statistics.__dict__[stat])
 
-        #maybe i should just return the mean values?
+        # NOTE: Might more more useful to instead return the mean values of each class in the corpus.
         elif hasattr(self, "corpus_statistics"):
             for level in self.classes:
                 print("Class", level, "first text's values")
