@@ -176,7 +176,13 @@ class Readability:
                         scores[level].append(func(text))
             # Output part of the scores, first text for each class
             for level in self.classes:
-                print("class", level, "text 0", "score" ,scores[level][0])
+                temp_score = 0
+                for index,score in enumerate(scores[level]):
+                    temp_score += score
+                    if hasattr(self, "corpus_statistics"):
+                        setattr(self.corpus_statistics[level][index],name,score)
+                temp_score = temp_score / len(scores[level])
+                print("class", level, "mean score :" ,temp_score)
             return scores
         else:
             return -1
@@ -281,18 +287,70 @@ class Readability:
                 scores[level] = []
                 for text in self.content[level]:
                     scores[level].append(func(text, self.nlp, mode))
-            # Output part of the scores, first text for each class
-            # NOTE : maybe output mean scores for each class instead.
             for level in self.classes:
-                print("class", level, "text 0", "score" ,scores[level][0])
+                temp_score = 0
+                for index,score in enumerate(scores[level]):
+                    temp_score += score
+                    if hasattr(self, "corpus_statistics"):
+                        setattr(self.corpus_statistics[level][index],locals()['type'],score)
+                temp_score = temp_score / len(scores[level])
+                print("class", level, "mean score :" ,temp_score)
             return scores
         else:
             return -1
 
-    
     def dubois_proportion(self,type = "total", filter = None):
         func = word_list_based.dubois_proportion
-        return func(self.content,self.nlp,type,filter)
+        if self.content_type == "text":
+            return func(self.content,self.nlp,type,filter)
+        elif self.content_type == "corpus":
+            scores = {}
+            for level in self.classes:
+                temp_score = 0
+                scores[level] = []
+                for index,text in enumerate(self.content[level]):
+                    scores[level].append(func(text,self.nlp,type,filter))
+                    temp_score += scores[level][index]
+                    if hasattr(self, "corpus_statistics"):
+                        self.corpus_statistics[level][index].dubois_buyse_ratio = scores[level][index]
+                temp_score = temp_score / len(scores[level])
+                print("class", level, "mean score :" ,temp_score)
+            return scores
+        else:
+            return -1
+
+    def average_levenshtein_distance(self,type = "old20"):
+        """
+        Returns the average Orthographic Levenshtein Distance 20 (OLD20), or its phonemic equivalent (PLD20).
+        Currently using the Lexique 3.0 database for French texts, version 3.83. More details here : http://www.lexique.org/
+        OLD20 is an alternative to the orthographical neighbourhood index that has been shown to correlate with text difficulty.
+
+        :param string type: What kind of value to return, OLD20 or PLD20.
+        :return: Average of OLD20 or PLD20 for each word in current text
+        :rtype: float
+        """
+        # Times for corpus tokens_split : [103.75190171699978, 476.5114750009998, 900.8312998260008, 1240.3407240750003]
+        # TODO : Optimize this, probably by only calling import_lexique_dataframe() once.
+        # Might need to make a function called average_levenshtein_distance_corpus() if it's worth it.
+        func = word_list_based.average_levenshtein_distance
+        if self.content_type == "text":
+            return func(self.content,self.nlp,type)
+        elif self.content_type == "corpus":
+            scores = {}
+            for level in self.classes:
+                temp_score = 0
+                scores[level] = []
+                for index,text in enumerate(self.content[level]):
+                    scores[level].append(func(text, self.nlp, type))
+                    temp_score += scores[level][index]
+                    if hasattr(self, "corpus_statistics"):
+                        setattr(self.corpus_statistics[level][index],locals()['type'],scores[level][index])
+                temp_score = temp_score / len(scores[level])
+                print("class", level, "mean score :" ,temp_score)
+ 
+            return scores
+        else:
+            return -1
 
 
     def compile(self):
@@ -302,7 +360,6 @@ class Readability:
         """
         #TODO : debloat this and/or refactor it since we copy-paste almost the same below
         if self.content_type == "text":
-            #I can probably do self.statistics.totalWords = 0 directly..
             totalWords = 0
             totalLongWords = 0
             totalSentences = len(self.content)
@@ -384,7 +441,6 @@ class Readability:
             
         :param corpus: Dictionary of lists of sentences (represented as a list of tokens)
         :type corpus: dict[class][text][sentence][token]
-
         :return: a pandas dataframe 
         :rtype: pandas.core.frame.DataFrame
         """
