@@ -5,7 +5,7 @@ For instance, mode == "root" will square the denominator of the ratio, and is su
 """
 import math
 import string
-
+from .. import utils
 # Lexico-semantic features :
 # ~ Difficulty of voc in text, like TTR/RTTR/CTTR.
 # need to find something about yule's k it seems to be used sometimes, but what does it mean?
@@ -27,19 +27,11 @@ def type_token_ratio(text, nlp = None, mode = None):
     """
     from collections import Counter
     # Convert to string if list/list of lists + handle punctuation.
-    if isinstance(text, str):
-        doc = text
+    doc = utils.convert_text_to_string(text)
 
-    elif any(isinstance(el, list) for el in text):
-        doc = ''
-        for sentence in text:
-            doc = doc + ' ' + ' '.join(sentence)
-        
-    elif isinstance(text, list):
-        doc = ' '.join(text)
-    
+    # NOTE: Maybe just use spacy instead to remove punctuation
     doc = doc.translate(str.maketrans('', '', string.punctuation))
-    # ^ Maybe just use spacy instead
+    
 
     nb_unique = len(Counter(doc.split()))
     nb_tokens = len(doc.split())
@@ -62,7 +54,7 @@ def type_token_ratio(text, nlp = None, mode = None):
         #print("DEBUG: Returning TTR ratio = ",nb_unique,"/",nb_tokens,":",nb_unique/nb_tokens)
         return(nb_unique/nb_tokens)
 
-# The following methods use the spacy "fr_core_news_sm" model to recognize lexical items.
+# The following methods use a spacy model to recognize lexical items.
 def noun_token_ratio(text,nlp=None, mode = None):
     """
     Outputs variant of the type token ratio, the TotalNoun/Noun Ratio.

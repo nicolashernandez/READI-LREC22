@@ -156,8 +156,9 @@ def dubois_proportion(text, nlp = None, typ = "total", filter = None):
     Returns the proportion of nouns included in the Dubois-Buyse word list for a specific text
     This function can specify the ratio for specific echelons, ages|school grades, or three-year cycles
     """
-    # TODO : allow filter to take the value "all" in order to print each ratio for a certain type(type= dataframe column, like age or echelon)
     # NOTE : possible improvement, add a plot bool parameter in order to show distribution of ratios for a certain type over all possible values.
+    # For example : for each text in a corpus, when gradually adding words that are learned at later ages,
+    # is the rate of words recognized in the list linear, quadratic, or something else? Could be useful.
     df = import_dubois_dataframe()
     text = utils.convert_text_to_string(text)
 
@@ -168,20 +169,40 @@ def dubois_proportion(text, nlp = None, typ = "total", filter = None):
     total_nouns_in_list = 0
     number_nouns_in_list = 0
     number_nouns = 0
-    #TODO : add a way to filter between two values, instead of subsetting for only one value
     if typ != "total":
+        if not isinstance(filter,(int,tuple,list)):
+            raise TypeError("Type of parameter 'filter' cannot be '", type(filter),"', needs to be int, tuple, or list")
+        # TODO : figure out a way to debloat this since the logic is the same, only some specific values change.
         if typ == "echelon":
-            if not(1 <= filter <= 43):
-                raise ValueError("Value of parameter 'filter' cannot be less than 1 or more than 43 when using parameter 'echelon'")
-            df = df.loc[df['Echelon'] == filter]
+            if isinstance(filter,int):
+                if not (1 <= filter <= 43):
+                    raise ValueError("Value of parameter 'filter' cannot be less than 1 or more than 43 when using parameter 'echelon'")
+                df = df.loc[df['Echelon'] == filter]
+            elif isinstance(filter,(tuple,list)):
+                for value in filter:
+                    if not(1 <= value <= 43):
+                        raise ValueError("Value of parameter 'filter' cannot be less than 1 or more than 43 when using parameter 'echelon'")
+                df = df.loc[df['Echelon'].between(filter[0],filter[1])]
         elif typ == "age":
-            if not(6 <= filter <= 15):
-                raise ValueError("Value of parameter 'filter' cannot be less than 6 or more than 15 when using parameter 'age'")
-            df = df.loc[df['age'] == filter]
+            if isinstance(filter,int):
+                if not (6 <= filter <= 15):
+                    raise ValueError("Value of parameter 'filter' cannot be less than 6 or more than 15 when using parameter 'age'")
+                df = df.loc[df['age'] == filter]
+            elif isinstance(filter,(tuple,list)):
+                for value in filter:
+                    if not(6 <= value <= 15):
+                        raise ValueError("Value of parameter 'filter' cannot be less than 6 or more than 15 when using parameter 'age'")
+                df = df.loc[df['age'].between(filter[0],filter[1])]
         elif typ == "cycle":
-            if not(2 <= filter <= 5):
-                raise ValueError("Value of parameter 'filter' cannot be less than 2 or more than 5 when using parameter 'cycle'")
-            df = df.loc[df['cycle'] == filter]
+            if isinstance(filter,int):
+                if not (2 <= filter <= 5):
+                    raise ValueError("Value of parameter 'filter' cannot be less than 2 or more than 5 when using parameter 'cycle'")
+                df = df.loc[df['cycle'] == filter]
+            elif isinstance(filter,(tuple,list)):
+                for value in filter:
+                    if not(2 <= value <= 5):
+                        raise ValueError("Value of parameter 'filter' cannot be less than 2 or more than 5 when using parameter 'cycle'")
+                df = df.loc[df['cycle'].between(filter[0],filter[1])]
         else:
             raise ValueError("Parameter 'type' with value", typ, "is not supported, please provide one of the following values instead : 'total', 'echelon', 'age', or 'cycle'")
     

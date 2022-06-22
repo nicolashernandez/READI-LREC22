@@ -22,7 +22,7 @@ from .models import bert, fasttext, models
 #     Add examples to the notebook to show how it can be used : ~ In progress.
 #     Add other measures that could be useful (Martinc | Crossley): X
 #     Experiment further : X
-#     
+#     Add more corpuses such as vikidia or wikimini (will start this afternoon)
 
 #10/06/22 checklist :
 # Convert demo_ functions into more user-friendly functions, with detailed documentation
@@ -55,15 +55,9 @@ class Readability:
 
         :param content: Content of a text, or a corpus
         :type content: str, list(str), list(list(str)), converted into list(list(str)) or dict[class][text][sentence][token]
-
-        :param lang: Language the text was written in, in order to adapt some scores.
-        :type lang: str
-
-        :param nlp: Type of NLP processor to use, indicated by a "type_subtype" string.
-        :type nlp: str
-
-        :param perplexity_processor: Type of processor to use for the calculation of pseudo-perplexity
-        :type perplexity_processor: str
+        :param str lang: Language the text was written in, in order to adapt some scores.
+        :param str nlp: Type of NLP processor to use, indicated by a "type_subtype" string.
+        :param str perplexity_processor: Type of processor to use for the calculation of pseudo-perplexity
         """
         self.lang = lang
         self.perplexity_processor = perplexity_processor
@@ -174,7 +168,6 @@ class Readability:
                 else:
                     for text in self.content[level]:
                         scores[level].append(func(text))
-            # Output part of the scores, first text for each class
             for level in self.classes:
                 temp_score = 0
                 for index,score in enumerate(scores[level]):
@@ -233,13 +226,14 @@ class Readability:
                 values[score] = self.score(score)
             return values
 
+
     def perplexity(self):
         """
         Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
         Please refer to this paper for more details : https://doi.org/10.18653%252Fv1%252F2020.acl-main.240
 
         :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
-        :rtype: float or list(float)
+        :rtype: :rtype: Union[float,dict[str][list(float)]] 
         """
         if not hasattr(self.perplexity_calculator, "model_loaded"):
             self.perplexity_calculator.load_model()
@@ -259,7 +253,7 @@ class Readability:
         For instance : new_r = Readability(r.remove_outliers(r.perplexity(),1))
 
         :return: a corpus, in a specific format where texts are represented as lists of sentences, which are lists of words.
-        :rtype: dict[class][text][sentence][token]
+        :rtype: dict[str][str][str][str]
         """
         if not hasattr(self.perplexity_calculator, "model_loaded"):
             self.perplexity_calculator.load_model()
@@ -270,9 +264,16 @@ class Readability:
             return self.perplexity_calculator.remove_outliers(self.content,perplex_scores,stddev_ratio)
         return -1
 
+
     def diversity(self, type, mode):
-        """TODO: explain what the arguments represent, type is which ratio to use : ttr, ntr..,
-        mode is which version of the formula : normal, root, corrected...
+        """
+        Outputs a measure of text diversity based on which feature to use, and which version of the formula is used.
+        If using this for a corpus instead of a text, returns a dictionary containing the relevant scores.
+        
+        :param str type: Which text diversity measure to use : "ttr" is text token ratio, "ntr" is noun token ratio
+        :param str mode: What kind of formula version to use, if applicable : "corrected", "root", and default standard are available for token ratios.
+        :return: a measure of text diversity, or a dictionary of these measures
+        :rtype: :rtype: Union[float,dict[str][list(float)]]
         """
         if type == "ttr":
             func = diversity.type_token_ratio
@@ -299,17 +300,28 @@ class Readability:
         else:
             return -1
 
-    def dubois_proportion(self,type = "total", filter = None):
+
+    def dubois_proportion(self, filter_type = "total", filter_value = None):
+        """
+        Outputs the proportion of words included in the Dubois-Buyse word list.
+        Can specify the ratio for words appearing in specific echelons, ages|school grades, or three-year cycles.
+
+        :param str filter_type: Which variable to use to filter the word list : 'echelon', 'age', or 'cycle'
+        :param str filter_value: Value (or iterable containing two values) for subsetting the word list.
+        :type filter_value: Union[int, tuple, list]
+        :return: a ratio of words in the current text, that appear in the Dubois-Buyse word list.
+        :rtype: Union[float,dict[str][list(float)]]
+        """
         func = word_list_based.dubois_proportion
         if self.content_type == "text":
-            return func(self.content,self.nlp,type,filter)
+            return func(self.content,self.nlp,filter_type,filter_value)
         elif self.content_type == "corpus":
             scores = {}
             for level in self.classes:
                 temp_score = 0
                 scores[level] = []
                 for index,text in enumerate(self.content[level]):
-                    scores[level].append(func(text,self.nlp,type,filter))
+                    scores[level].append(func(text,self.nlp,filter_type,filter_value))
                     temp_score += scores[level][index]
                     if hasattr(self, "corpus_statistics"):
                         self.corpus_statistics[level][index].dubois_buyse_ratio = scores[level][index]
@@ -325,13 +337,13 @@ class Readability:
         Currently using the Lexique 3.0 database for French texts, version 3.83. More details here : http://www.lexique.org/
         OLD20 is an alternative to the orthographical neighbourhood index that has been shown to correlate with text difficulty.
 
-        :param string type: What kind of value to return, OLD20 or PLD20.
+        :param str type: What kind of value to return, OLD20 or PLD20.
         :return: Average of OLD20 or PLD20 for each word in current text
-        :rtype: float
+        :rtype: Union[float,dict[str][list(float)]]
         """
         # Times for corpus tokens_split : [103.75190171699978, 476.5114750009998, 900.8312998260008, 1240.3407240750003]
         # TODO : Optimize this, probably by only calling import_lexique_dataframe() once.
-        # Might need to make a function called average_levenshtein_distance_corpus() if it's worth it.
+        # Might need to make a function called average_levenshtein_distance_corpus() if it's worth the time gain
         func = word_list_based.average_levenshtein_distance
         if self.content_type == "text":
             return func(self.content,self.nlp,type)
@@ -347,7 +359,6 @@ class Readability:
                         setattr(self.corpus_statistics[level][index],locals()['type'],scores[level][index])
                 temp_score = temp_score / len(scores[level])
                 print("class", level, "mean score :" ,temp_score)
- 
             return scores
         else:
             return -1
