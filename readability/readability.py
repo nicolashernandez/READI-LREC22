@@ -22,7 +22,7 @@ from .models import bert, fasttext, models
 #     Add examples to the notebook to show how it can be used : ~ In progress.
 #     Add other measures that could be useful (Martinc | Crossley): X
 #     Experiment further : X
-#     Add more corpuses such as vikidia or wikimini (will start this afternoon)
+#     Add more corpuses such as vikidia or wikimini (will probably start this 22 june afternoon)
 
 #10/06/22 checklist :
 # Convert demo_ functions into more user-friendly functions, with detailed documentation
@@ -429,7 +429,7 @@ class Readability:
     def stats(self):
         """
         Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.
-        In this case, this will output the statistics for the first text for every class
+        In this case, this will output the mean values of each score for each class.
         """
         if hasattr(self, "statistics"):
             for stat in self.statistics.__dict__:
@@ -438,11 +438,15 @@ class Readability:
         # NOTE: Might more more useful to instead return the mean values of each class in the corpus.
         elif hasattr(self, "corpus_statistics"):
             for level in self.classes:
-                print("Class", level, "first text's values")
-                for stat in self.corpus_statistics[level][0].__dict__:
-                    print(stat, "=", self.corpus_statistics[level][0].__dict__[stat])
+                class_values = dict.fromkeys(self.corpus_statistics[level][0].__dict__, 0)
+                for stats in self.corpus_statistics[level]:
+                    for stat in stats.__dict__:
+                        class_values[stat] += stats.__dict__[stat]
+                print("Mean values for class :",level)
+                class_values.update((key, round(value/len(self.corpus_statistics[level]),2)) for key,value in class_values.items())
+                print(class_values)
         else:
-            print("You need to apply the .compile() function before in order to view this",self.content_type,"' statistics")
+            print("You need to use the .compile() function before in order to view this",self.content_type,"' statistics")
 
 
     # NOTE: Maybe this should go in the stats subfolder to have less bloat.
