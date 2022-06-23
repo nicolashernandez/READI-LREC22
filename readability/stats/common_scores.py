@@ -33,7 +33,8 @@ def GFI_score(text, statistics=None):
         totalWords += len(sent)
         totalLongWords += len([token for token in sent if len(token)>6])
     if totalWords < 101:
-        print("WARNING : Number of words is less than 100, This score is inaccurate")
+        #print("WARNING : Number of words is less than 100, This score is inaccurate")
+        pass
     
     score = 0.4*((totalWords/totalSentences) + 100*totalLongWords/totalSentences)
     return score

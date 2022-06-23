@@ -1,12 +1,15 @@
 """
-The Readability module interacts with the library's submodules to provide a bunch of useful functions / reproduce the READI paper's contents
+The Readability module interacts with the library's submodules to provide a bunch of useful functions and scores for estimating the readability of a text
+It will eventually support different languages.
 
-It provides the following services :
-At start-up : it "converts" a text into a structure useful for the other functions, and can also calculate relevant statistics via the .compile function (number of words, sentences, syllables, etc..)
-Enables a way to access "simple" scores using these statistics
-Perform lazy loading of more complicated things, like calculating perplexity or the use of Machine Learning / Deep Learning models
-It can be customized based on which NLP processor to use, or what language to evaluate.
+This module provides the following services :
+At start-up : it "converts" a text or corpus into a structure useful for the other functions, and can also calculate relevant statistics via the .compile function (number of words, sentences, syllables, etc..)
+Calculating scores can be done without compiling beforehand, but is recommended in order to store information/scores each time a function is used, which can help speed up other functions.
+This module also lazily loads external resources for more complicated things, like calculating perplexity or the use of Machine Learning / Deep Learning models
 """
+import copy
+import math
+
 import pandas as pd
 import spacy
 import utils
@@ -14,21 +17,17 @@ from .stats import diversity, perplexity, common_scores, word_list_based, syntac
 from .methods import methods
 from .models import bert, fasttext, models
 
+# FIXME : I broke the package structure at one point without noticing, fix setup.cfg or figure out what causes the problems.
+
 # Checklist :
 #     Remake structure to help differenciate between functions : ~ I think it's okay but I need some feedback
-#     Enable a way to "compile" in order to use underlying functions faster : ~ It's done, need to implement tests.
-#     Make sure code works both for texts (strings, or pre-tokenized texts) and corpus structure : ~ I think it works now.
-#     Add the methods related to machine learning or deep learning : V
-#     Add examples to the notebook to show how it can be used : ~ In progress.
-#     Add other measures that could be useful (Martinc | Crossley): X
-#     Experiment further : X
-#     Add more corpuses such as vikidia or wikimini (will probably start this 22 june afternoon)
-
-#10/06/22 checklist :
-# Convert demo_ functions into more user-friendly functions, with detailed documentation
-# Figure out why some results are slightly off for the ljl corpus compared to what's in the paper
-# Start implementing more measures / experiment
-
+#     Enable a way to "compile" in order to use underlying functions faster : V It's done, I should implement tests.
+#     Make sure code works both for texts (strings, or pre-tokenized texts) and corpus structure : ~ I think it works now, need to provide a function that converts "anything" to a corpus structure
+#     Add the methods related to machine learning or deep learning : ~ Need to make slightly different version for users (and document them)
+#     Add examples to the notebook to show how it can be used : ~ Done, need feedback now
+#     Add other measures that could be useful (Martinc | Crossley): ~ This is taking more time than expected since I'm also trying to understand what these do and why use them
+#     Experiment further : X Unfortunately, I haven't given much thought into how estimating readability could be improved, or if our hypotheses are sound.
+#     Add more corpuses such as vikidia or wikimini : X (will probably start june 22 afternoon)
 
 
 # FIXME : several formulas are incorrect, as outlined in the submodule stats/common_scores.
@@ -43,7 +42,7 @@ class Statistics:
 class Readability:
     """
     The Readability class provides a way to access the underlying library modules in order to help estimate the complexity of any given text
-    List of methods : __init__, corpus_info, compile, stats, score(score_name), scores, perplexity, remove_outliers, diversity(type,mode)
+    List of methods : __init__, compile, corpus_info, stats, remove_outliers, score(score_name), scores, perplexity, do_function_with_default_arguments, get_corpus_scores, dubois_proportion, average_levenshtein_distance,
     List of attributes : content, content_type, lang, nlp, perplexity_processor, classes, statistics, corpus_statistics
 
     In its current state, scores are meant to be used with the French language, but this can change in the future.
@@ -62,8 +61,7 @@ class Readability:
         self.lang = lang
         self.perplexity_processor = perplexity_processor
         self.perplexity_calculator = perplexity.pppl_calculator
-
-
+        
         # Handle the NLP processor (mainly for tokenization in case we're given a text as a string)
         # Note : I tried adding the spacy model as a dependency in setup.cfg:
         # fr_core_news_sm@https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.3.0/fr_core_news_sm-3.3.0.tar.gz#egg=fr_core_news_sm
@@ -74,8 +72,7 @@ class Readability:
                 self.nlp = spacy.load('fr_core_news_sm')
                 print("DEBUG: Spacy model location (already installed) : ",self.nlp._path)
             except OSError:
-                print('Downloading spacy language model \n'
-                            "(Should happen only once)")
+                print('Downloading spacy language model \n(Should only happen once)')
                 from spacy.cli import download
                 download('fr_core_news_sm')
                 self.nlp = spacy.load('fr_core_news_sm')
@@ -96,7 +93,6 @@ class Readability:
                 nb_words += len(sentence)
             if nb_words < 101:
                 print("WARNING : Text length is less than 100 words, some scores will be inaccurate.")
-            print(nb_words)
 
         # Handling text that doesn't need to be converted
         elif any(isinstance(el, list) for el in content):
@@ -115,8 +111,7 @@ class Readability:
             if nb_words < 101:
                 print("WARNING : Text length is less than 100 words, some scores will be inaccurate.")
 
-
-        # Check if input is a corpus.
+        # Handling corpus that probably is a corpus
         else:
             # Reminder, structure needed is : dict => list of texts => list of sentences => list of words
             # TODO : check this with a bunch of edge cases
@@ -129,6 +124,27 @@ class Readability:
                             self.classes = list(content.keys())
             #else, check if the structure is dict[class][text].. and tokenize everything (warn user it'll take some time)
             #and then use that as the new structure
+        
+
+        # This is a dictionary that maps values that can be obtained from the readability class with the functions used to calculate them.
+        # This is used for generalizable methods such as remove_outliers can be used no matter what kind of score.
+        # It differenciates between scores that are obtained directly from a function, or functions that need a parameter to indicate the type of score to return.
+        self.score_types = dict(
+            no_argument_needed = dict(
+                gfi=self.gfi,
+                ari=self.ari,
+                fre=self.fre,
+                fkgl=self.fkgl,
+                smog=self.smog,
+                rel=self.rel,
+                perplexity=self.perplexity,
+                dubois_buyse_ratio=self.dubois_proportion),
+            argument_needed = dict(
+                ttr=self.diversity,
+                ntr=self.diversity,
+                old20=self.average_levenshtein_distance,
+                pld20=self.average_levenshtein_distance)
+            )
 
     def score(self, name):
         """
@@ -212,7 +228,8 @@ class Readability:
         :return: a pandas dataframe (or a list of scores)
         :rtype: Union[pandas.core.frame.DataFrame,list] 
         """
-        #NOTE : Would be better to have this point to a scores_text() and scores_corpus(), which returns only one type.
+        # NOTE : Need to rename this to something clearer, since we now have a method called "getScores"
+        # NOTE : Would be better to have this point to a scores_text() and scores_corpus(), which returns only one type.
         if self.content_type == "corpus":
             if hasattr(self, "corpus_statistics"):
                 return common_scores.traditional_scores(self.content, self.corpus_statistics)
@@ -236,36 +253,23 @@ class Readability:
         :rtype: :rtype: Union[float,dict[str][list(float)]] 
         """
         if not hasattr(self.perplexity_calculator, "model_loaded"):
+            print("Loading model for pseudo-perplexity..")
             self.perplexity_calculator.load_model()
             print("Model is now loaded")
         print("Please be patient, pseudo-perplexity takes a lot of time to calculate.")
         if self.content_type == "text":
             return self.perplexity_calculator.PPPL_score_text(self.content)
         elif self.content_type == "corpus":
-            return self.perplexity_calculator.PPPL_score(self.content)
-        return -1
-    
-    def remove_outliers(self,perplex_scores,stddev_ratio):
-        """
-        Outputs a corpus, after removing texts which are considered to be "outliers", based on a standard deviation ratio
-        A text is an outlier if its pseudo-perplexity value is lower or higher than this : mean +- standard_deviation * ratio
-        In order to exploit this new corpus, you'll need to make a new Readability instance.
-        For instance : new_r = Readability(r.remove_outliers(r.perplexity(),1))
-
-        :return: a corpus, in a specific format where texts are represented as lists of sentences, which are lists of words.
-        :rtype: dict[str][str][str][str]
-        """
-        if not hasattr(self.perplexity_calculator, "model_loaded"):
-            self.perplexity_calculator.load_model()
-            print("Model for calculating perplexity is now loaded")
-        if self.content_type == "text":
-            raise TypeError('Content type is not corpus, please load something else to use this function.')
-        elif self.content_type == "corpus":
-            return self.perplexity_calculator.remove_outliers(self.content,perplex_scores,stddev_ratio)
+            scores = self.perplexity_calculator.PPPL_score(self.content)
+            if hasattr(self, "corpus_statistics"):
+                for level in self.classes:
+                    for index,score in enumerate(scores[level]):
+                        setattr(self.corpus_statistics[level][index],"perplexity",score)
+            return scores
         return -1
 
 
-    def diversity(self, type, mode):
+    def diversity(self, type, mode=None):
         """
         Outputs a measure of text diversity based on which feature to use, and which version of the formula is used.
         If using this for a corpus instead of a text, returns a dictionary containing the relevant scores.
@@ -285,20 +289,16 @@ class Readability:
         elif self.content_type == "corpus":
             scores = {}
             for level in self.classes:
-                scores[level] = []
-                for text in self.content[level]:
-                    scores[level].append(func(text, self.nlp, mode))
-            for level in self.classes:
                 temp_score = 0
-                for index,score in enumerate(scores[level]):
-                    temp_score += score
+                scores[level] = []
+                for index,text in enumerate(self.content[level]):
+                    scores[level].append(func(text, self.nlp, mode))
+                    temp_score += scores[level][index]
                     if hasattr(self, "corpus_statistics"):
-                        setattr(self.corpus_statistics[level][index],locals()['type'],score)
+                        setattr(self.corpus_statistics[level][index],locals()['type'],scores[level][index])
                 temp_score = temp_score / len(scores[level])
                 print("class", level, "mean score :" ,temp_score)
             return scores
-        else:
-            return -1
 
 
     def dubois_proportion(self, filter_type = "total", filter_value = None):
@@ -362,6 +362,134 @@ class Readability:
             return scores
         else:
             return -1
+
+
+    def stub_discourse():
+        #TODO : cohesion / coherence, need to figure out how to use NLTK or Spacy for that
+        return -1
+
+
+    def stub_rsrs():
+        #TODO : check sobmodule for implementation details
+        return -1
+
+
+    def stub_SVM():
+        #TODO: allow user to use default tf-idf matrix thing or with currently known features from other methods(common_scores text diversity, etc..)
+        return -1
+
+    def stub_MLP():
+        #TODO: allow user to use default tf-idf matrix thing or with currently known features from other methods(common_scores text diversity, etc..)
+        return -1
+
+    def stub_compareModels():
+        #NOTE: this is probably not too high on the priority list of things to do.
+        return -1
+
+
+    def stub_fastText():
+        return -1
+        
+    def stub_BERT():
+        return -1
+
+    # Utility functions that I don't think I can put in utils
+    def do_function_with_default_arguments(self,score_type):
+        """Utility function that calls one of the function listed in self.score_types with default arguments"""
+        if score_type in self.score_types["no_argument_needed"].keys():
+            func = self.score_types["no_argument_needed"][score_type]
+            print("WARNING : Score type '",score_type,"' not found in current instance, now using function ",func.__name__, " with default parameters",sep="")
+            return func()
+        elif score_type in self.score_types["argument_needed"].keys():
+            func =  self.score_types["argument_needed"][score_type]
+            print("WARNING : Score type '",score_type,"' not found in current instance, now using function ",func.__name__, " with default parameters",sep="")
+            return func(score_type)
+    
+    def get_corpus_scores(self, score_type=None, scores=None):
+        """
+        Utility function that searches relevant scores if a valid score_type that belongs to self.score_types is specified.
+        If no scores can be recovered, this function will attempt to call the corresponding function with default arguments.
+
+        :return: a dictionary, assigning a value to each text of each specified class of a corpus.
+        :rtype: dict[str][str][str][str]
+        """
+        # There are 5 cases:
+        # score_type is unknown : error
+        # score_type is known,scores are known : do the actual function
+        # score_type is known, scores are unknown, but stored inside corpus.stats : extract them then do actual function
+        # score_type is known, scores are unkown, can't be found inside corpus_stats : get them w/ default then do actual function
+        # score_type is known, scores are unknown, and not stored : get them w/ default param then do actual function
+
+        if self.content_type == "text":
+            raise TypeError('Content type is not corpus, please load something else to use this function.')
+        if score_type not in list(self.score_types['no_argument_needed'].keys()) + list(self.score_types['argument_needed'].keys()):
+            raise RuntimeError("the score type '", score_type ,"' is not recognized by the current Readability object, please pick one from", list(self.score_types['no_argument_needed'].keys()) + list(self.score_types['argument_needed'].keys()))
+        if score_type is not None:
+            if not hasattr(self,"corpus_statistics"):
+                print("Suggestion : Use Readability.compile() beforehand to allow the Readability object to store information when using other methods.")
+                if scores is not None:
+                    # Case : user provides scores even though .compile() was never used, trust these scores and perform next function.
+                    print("Now using user-provided scores from 'scores' argument")
+                    pass
+                else:
+                    # Case : user provides no scores and cannot refer to self to find the scores, so use corresponding function with default parameters.
+                    scores = self.do_function_with_default_arguments(score_type)
+
+            elif not hasattr(self.corpus_statistics[self.classes[0]][0],score_type):
+                # Case : self.corpus_statistics exists, but scores aren't found when referring to self, so using corresponding function with default parameters.
+                scores = self.do_function_with_default_arguments(score_type)
+            else:
+                # Case : scores found via referring to self.corpus_statistics, so just extract them.
+                scores = {}
+                for level in self.classes:
+                    scores[level] = []
+                    for score_dict in self.corpus_statistics[level]:
+                        scores[level].append(score_dict.__dict__[score_type])
+
+            return scores
+    
+
+    def remove_outliers(self, stddevratio=1, score_type=None, scores=None):
+        """
+        Outputs a corpus, after removing texts which are considered to be "outliers", based on a standard deviation ratio
+        A text is an outlier if its value value is lower or higher than this : mean +- standard_deviation * ratio
+        In order to exploit this new corpus, you'll need to make a new Readability instance.
+        For instance : new_r = Readability(r.remove_outliers(r.perplexity(),1))
+
+        :return: a corpus, in a specific format where texts are represented as lists of sentences, which are lists of words.
+        :rtype: dict[str][str][str][str]
+        """
+        scores = self.get_corpus_scores(score_type,scores)
+        moy = list()
+        for level in self.classes:
+            inner_moy=0
+            for score in scores[level]:
+                inner_moy+= score/len(scores[level])
+            moy.append(inner_moy)
+
+        stddev = list()
+        for index, level in enumerate(self.classes):
+            inner_stddev=0
+            for score in scores[level]:
+                inner_stddev += ((score-moy[index])**2)/len(scores[level])
+            inner_stddev = math.sqrt(inner_stddev)
+            stddev.append(inner_stddev)
+
+        outliers_indices = scores.copy()
+        for index, level in enumerate(self.classes):
+            outliers_indices[level] = [idx for idx in range(len(scores[level])) if scores[level][idx] > moy[index] + (stddevratio * stddev[index]) or scores[level][idx] < moy[index] - (stddevratio * stddev[index])]
+            print("nb textes enleves(",level,") :", len(outliers_indices[level]),sep="")
+            print(outliers_indices[level])
+
+        corpus_no_outliers = copy.deepcopy(scores)
+        for level in self.classes:
+            offset = 0
+            for index in outliers_indices[level][:]:
+                corpus_no_outliers[level].pop(index - offset)
+                offset += 1
+            print("New number of texts for class", level, ":", len(corpus_no_outliers[level]))
+        print("In order to use this new corpus, you'll have to make a new Readability instance.")
+        return corpus_no_outliers
 
 
     def compile(self):

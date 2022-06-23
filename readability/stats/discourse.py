@@ -32,3 +32,11 @@ and POS-tag based cohesion measures.
 
 # It might be relevant to include ways to test the importance of these futures for users of this lib, maybe just provide multiple linear regression
 # and semi-partial correlation at the same time.
+
+#I stopped at 2   Propositional Logic of https://www.nltk.org/book/ch10.html but I don't think it's the best thing to follow
+
+def stub_coherence():
+    return 0
+
+def stub_cohesion():
+    return 0
