@@ -5,7 +5,7 @@ For instance, mode == "root" will square the denominator of the ratio, and is su
 """
 import math
 import string
-from .. import utils
+from ..utils import utils
 # Lexico-semantic features :
 # ~ Difficulty of voc in text, like TTR/RTTR/CTTR.
 # need to find something about yule's k it seems to be used sometimes, but what does it mean?

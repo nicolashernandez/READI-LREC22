@@ -5,6 +5,8 @@ import ktrain
 from ktrain import text
 import os
 
+DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
+
 def demo_loadCorpusForTransformer(DATA_PATH, random_seed = 42, percent_train = 90):
     """Loads a csv file, and splits it into a train/test subset."""
     with open(DATA_PATH, 'r' ) as f:
@@ -87,7 +89,8 @@ def demo_doBert(name='ljl',test_flag = False):
         class_names_list = list()
         
         for CORPUSNAME in corpusnames:
-            DATA_PATH = os.path.join(os.getcwd(),'data',CORPUSNAME)+ '_hotvector.csv'
+            
+            DATA_PATH = os.path.join(DATA_ENTRY_POINT,CORPUSNAME)+ '_hotvector.csv'
 
             class_names =  models.demo_get_csv_fieldnames(DATA_PATH)[2:]
             class_names_list.append(class_names)

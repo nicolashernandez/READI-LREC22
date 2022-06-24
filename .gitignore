@@ -129,12 +129,13 @@ dmypy.json
 .pyre/
 
 # Removing specific "dev help" files :
-library/DEVREADME.md
+readability/DEVREADME.md
 DEVREADME.md
-library/test_data
+readability/test_data
 test_data
-library/pyvenv.cfg
+readability/pyvenv.cfg
 pyvenv.cfg
 
 # Hiding library build/config files for now
+readability/LICENSE
 LICENSE

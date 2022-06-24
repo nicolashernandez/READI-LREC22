@@ -3,7 +3,7 @@
 from math import isnan
 import os
 import pandas as pd
-from .. import utils
+from ..utils import utils
 from collections import Counter
 # Cognitive features :
 # 1. Proportion of abstract and concrete words :
@@ -19,14 +19,16 @@ from collections import Counter
 # = Average distance of 20 closest words found in lexicon, or closest phonemes.
 # Can be found on the 125,623 entries of the Lexique 3.6 database.
 
+DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
+
 lexique_df = None
 def import_lexique_dataframe():
     """Imports contents of a slimmed version of the Lexique 3.0 database, Available here : http://www.lexique.org/"""
     global lexique_df
     if not isinstance(lexique_df,pd.DataFrame):
         #print("lexique dataframe imported")
-        #DATA_PATH = os.path.join(os.getcwd(),'data','lexique','Lexique383.tsv')
-        DATA_PATH = os.path.join(os.getcwd(),'data','lexique','Lexique383_slim.tsv')
+        #DATA_PATH = os.path.join(DATA_ENTRY_POINT,'lexique','Lexique383.tsv')
+        DATA_PATH = os.path.join(DATA_ENTRY_POINT,'lexique','Lexique383_slim.tsv')
         df=pd.read_csv(DATA_PATH, sep = '\t')
         lexique_df = df
         return df
@@ -48,7 +50,7 @@ def slim_lexique():
     # Keep only relevant columns for now : From 35 columns to 3.
     #df = df[['lemme','old20','pld20']]
     df = df[['ortho','old20','pld20']]
-    DATA_PATH = os.path.join(os.getcwd(),'data','lexique','Lexique383_slim.tsv')
+    DATA_PATH = os.path.join(DATA_ENTRY_POINT,'lexique','Lexique383_slim.tsv')
     df.to_csv(DATA_PATH,sep = "\t", index=False)
     print("saved slimmer lexique in data/lexique/")
     return 0
@@ -137,7 +139,7 @@ def import_dubois_dataframe():
     global dubois_df
     if not isinstance(dubois_df,pd.DataFrame):
         #print("dubois dataframe imported")
-        DATA_PATH = os.path.join(os.getcwd(),'data','word_list','Dubois_Buysse.xlsx')
+        DATA_PATH = os.path.join(DATA_ENTRY_POINT,'word_list','Dubois_Buysse.xlsx')
         df=pd.read_excel(DATA_PATH)
         dubois_df = df
         return df

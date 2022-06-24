@@ -1,2 +1,2 @@
 from .readability import Readability
-import utils
+from .utils import utils

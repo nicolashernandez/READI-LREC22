@@ -12,12 +12,10 @@ import math
 
 import pandas as pd
 import spacy
-import utils
+from .utils import utils
 from .stats import diversity, perplexity, common_scores, word_list_based, syntactic, discourse, rsrs
 from .methods import methods
 from .models import bert, fasttext, models
-
-# FIXME : I broke the package structure at one point without noticing, fix setup.cfg or figure out what causes the problems.
 
 # Checklist :
 #     Remake structure to help differenciate between functions : ~ I think it's okay but I need some feedback
@@ -33,6 +31,7 @@ from .models import bert, fasttext, models
 # FIXME : several formulas are incorrect, as outlined in the submodule stats/common_scores.
 # These being GFI, ARI due to wrong formulas, SMOG due to an error in calculating polysyllables, FRE due to a wrong variable assignation.
 # For now, we kept these as is, in order to keep the paper's experiments reproducible
+
 
 
 # NOTE: There probably exists a better way to create an Statistics object as an attribute of Readability.

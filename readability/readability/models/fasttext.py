@@ -5,6 +5,8 @@ import os
 from ktrain import text
 from csv import DictReader
 
+DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
+
 def demo_getFastText(DATA_PATH, class_names):
     """Uses the ktrain library to load the fastText model, then creates a learner object based on data split into train/test"""
     NUM_WORDS = 50000
@@ -57,7 +59,7 @@ def demo_doFastText(name='ljl',test_flag = False):
 
     for CORPUSNAME in corpusnames:
         
-        DATA_PATH = os.path.join(os.getcwd(),'data',CORPUSNAME)+ '_hotvector.csv'
+        DATA_PATH = os.path.join(DATA_ENTRY_POINT,CORPUSNAME)+ '_hotvector.csv'
  
         class_names =  models.demo_get_csv_fieldnames(DATA_PATH)[2:]
         class_names_list.append(class_names)
@@ -121,7 +123,7 @@ def demo_doFastText(name='ljl',test_flag = False):
     return 0
 
 def demo_checkLR(name='ljl'):
-    DATA_PATH = os.path.join(os.getcwd(),'data',name)+ '_hotvector.csv'
+    DATA_PATH = os.path.join(DATA_ENTRY_POINT,name)+ '_hotvector.csv'
   
     class_names =  models.demo_get_csv_fieldnames(DATA_PATH)[2:]
     print (class_names)    

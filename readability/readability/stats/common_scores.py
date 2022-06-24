@@ -6,7 +6,7 @@ import math
 from unidecode import unidecode
 import pandas as pd
 from scipy.stats import pearsonr
-from .. import utils
+from ..utils import utils
 
 
 # Text "must" be a list of sentences, which are lists of words.
