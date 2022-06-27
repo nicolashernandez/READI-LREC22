@@ -67,16 +67,7 @@ def noun_token_ratio(text,nlp=None, mode = None):
     :rtype: float
     """
     from collections import Counter
-    if isinstance(text, str):
-        doc = text
-
-    elif any(isinstance(el, list) for el in text):
-        doc = ''
-        for sentence in text:
-            doc = doc + ' ' + ' '.join(sentence)
-        
-    elif isinstance(text, list):
-        doc = ' '.join(text)
+    doc = utils.convert_text_to_string(text)
 
     #TODO : check type of current nlp try catch
     nouns = [token.text for token in nlp(doc) if (not token.is_punct and token.pos_ == "NOUN")]

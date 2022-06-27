@@ -25,7 +25,23 @@ from .models import bert, fasttext, models
 #     Add examples to the notebook to show how it can be used : ~ Done, need feedback now
 #     Add other measures that could be useful (Martinc | Crossley): ~ This is taking more time than expected since I'm also trying to understand what these do and why use them
 #     Experiment further : X Unfortunately, I haven't given much thought into how estimating readability could be improved, or if our hypotheses are sound.
-#     Add more corpuses such as vikidia or wikimini : X (will probably start june 22 afternoon)
+
+# For now :
+#     Fix notebook.. again. I used things like os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
+#     to reference the data folder that is a parent of the lib, but some user environments
+#     refer to the lib via a '/usr/local/lib/python3.7/....' path (or something similar since it is instlled..).
+#     So it fails since the data folder isn't included in the library.
+#     Either duplicate data inside the lib or apply a band-aid fix to the notebook (Not a good idea)
+
+#     Continue developping discourse/cohesion/coherence features.
+#     Ajouter une fonction pour générer tableau récap des features disponibles (ou celles déja calculées aprés .compile())
+#     Permettre de calculer scores|correlations en + automatiquement (Calculer scores de corr pour features cohesion (1er corpus minimum))
+#     Ajouter mesure de semi-partial correlation
+
+# Extra (not urgent) :
+#     Add more corpuses such as vikidia or wikimini : X (will probably start june 22 afternoon) :
+#     I suppose I could crawl a bunch of articles on wikimini, and search for them on Wikipedia, hopefully getting a match.
+#     ~300-500 articles should be enough.
 
 
 # FIXME : several formulas are incorrect, as outlined in the submodule stats/common_scores.
@@ -229,6 +245,8 @@ class Readability:
         """
         # NOTE : Need to rename this to something clearer, since we now have a method called "getScores"
         # NOTE : Would be better to have this point to a scores_text() and scores_corpus(), which returns only one type.
+        # TODO : re-do this : show every available score if .compile() was done (and their pearson correlation)
+        # Semi-partial correlation should also be available, but ask user beforehand since might need time to recalculate.
         if self.content_type == "corpus":
             if hasattr(self, "corpus_statistics"):
                 return common_scores.traditional_scores(self.content, self.corpus_statistics)
@@ -363,8 +381,9 @@ class Readability:
             return -1
 
 
-    def stub_discourse():
-        #TODO : cohesion / coherence, need to figure out how to use NLTK or Spacy for that
+    def stub_discourse(self):
+        func = discourse.nb_pronouns
+        return func(self.content,self.nlp)
         return -1
 
 
@@ -391,6 +410,7 @@ class Readability:
         
     def stub_BERT():
         return -1
+
 
     # Utility functions that I don't think I can put in utils
     def do_function_with_default_arguments(self,score_type):
