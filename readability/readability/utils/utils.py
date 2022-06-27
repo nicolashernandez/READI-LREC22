@@ -10,7 +10,7 @@ from unidecode import unidecode
 # Note : remove this when we're done, this is just a quick dev workaround
 # Will have to fix this with the new structure...
 DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
-print(os.path.abspath(os.path.dirname(__file__)))
+#print(os.path.abspath(os.path.dirname(__file__)))
 def test_import(file_path):
     with open(os.path.join(DATA_ENTRY_POINT,file_path+".pkl"),"rb") as file:
         return pickle.load(file)
