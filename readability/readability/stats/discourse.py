@@ -7,6 +7,9 @@ and POS-tag based cohesion measures.
 import math
 from ..utils import utils
 from collections import Counter
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Paper by A.Todirascu freely available here in case I need more details : https://hal.archives-ouvertes.fr/hal-01430554/document
 
@@ -53,11 +56,12 @@ from collections import Counter
 
 # Pos-tag based features : 
 # TODO : make a wrapper | decorator to indicate that these do pretty much the same thing
+
+spacy_pronoun_tags = ["PRON", "PRP", "PRP$", "WP", "WP$", "PDAT", "PDS", "PIAT", "PIDAT", "PIS", "PPER", "PPOSAT", "PPOSS", "PRELAT", "PRELS", "PRF", "PWAT", "PWAV", "PWS", "PN"]
+
 def nb_pronouns(text, nlp = None, mode="text"):
     """Returns the numbers of pronouns in a text, also available per sentence by giving the argument mode='sentence'"""
     # Pronoun tags available here, https://github.com/explosion/spaCy/blob/master/spacy/glossary.py
-    spacy_pronoun_tags = ["PRON", "PRP", "PRP$", "WP", "WP$", "PDAT", "PDS", "PIAT", "PIDAT", "PIS", "PPER", "PPOSAT", "PPOSS", "PRELAT", "PRELS", "PRF", "PWAT", "PWAV", "PWS", "PN"]
-
     def spacy_filter(doc, nlp):
         return [token.text for token in nlp(doc) if (token.pos_ in spacy_pronoun_tags)]
     
@@ -85,11 +89,52 @@ def nb_proper_nouns(text, nlp=None, mode="text"):
 
 # Measures related to lexical cohesion :
 
-def tfidf_thing():
-    #Cosine similarity between similar sentences...
-    #project them into word space with tfidf.. sure.
-    # pure text | lemmas | sub-group text | sub-group lemma
-    # so I need to figure out how to recognize nouns and proper names and pronouns (I do for nouns and pronouns, need to check for proper names.)
+def average_cosine_similarity_tfidf(text, nlp = None, mode="text"):
+    """
+    Returns the average cosine similarity between adjacent sentences in a text.
+    By using the 'mode' parameter, can use inflected forms of tokens or the corresponding lemmas, possibly filtering the text beforehand
+    in order to keep only nouns, proper names, and pronouns.
+    Valid values for mode are : 'text', 'lemma', 'subgroup_text', 'subgroup_lemma'.
+    """
+    # Group sentences together to be compatible with the tfidf_vectorizer and prepare tokens depending on selected mode :
+    # text | lemmas | sub-grouped text | sub-grouped lemmas
+    sentences = utils.convert_text_to_sentences(text, nlp)
+    prepped_text = []
+
+    if mode == "text":
+        def spacy_filter(doc, nlp):
+            return [token.text for token in nlp(doc)]
+    elif mode == "lemma":
+        def spacy_filter(doc, nlp):
+            return [token.lemma_ for token in nlp(doc)]
+    elif mode == "subgroup_text":
+        def spacy_filter(doc, nlp):
+            return [token.text for token in nlp(doc) if (token.pos_ in spacy_pronoun_tags) or (token.pos_ == "PROPN") or (token.pos_ == "NOUN")]
+    elif mode == "subgroup_lemma":
+        def spacy_filter(doc, nlp):
+            return [token.lemma_ for token in nlp(doc) if (token.pos_ in spacy_pronoun_tags) or (token.pos_ == "PROPN") or (token.pos_ == "NOUN")]
+    else:
+        raise TypeError("Type of parameter 'mode' cannot be '", type(mode),"', needs to be 'text', 'lemma', 'subgroup_text', 'subgroup_lemma'")
+    
+    for sentence_tokens in sentences:
+        doc = ' '.join(sentence_tokens)
+        prepped_text.append(spacy_filter(doc,nlp))
+
+    doc = utils.group_words_in_sentences(prepped_text)
+    tfidf_vectorizer = TfidfVectorizer()
+    tfidf_matrix = tfidf_vectorizer.fit_transform(doc)
+    similarity_matrix = cosine_similarity(tfidf_matrix)
+    average_cosine_similarity = 0
+
+    # Average the cosine_similarity value between each adjacent sentence
+    for index, submatrix in enumerate(similarity_matrix[:-1]):
+        average_cosine_similarity += submatrix[index+1] 
+        print(average_cosine_similarity)
+    average_cosine_similarity = average_cosine_similarity / len(similarity_matrix[:-1])
+
+    return average_cosine_similarity
+
+def stub_LSA(text, nlp = None, mode="not_defined_yet"):
     return 0
 
 def entity_density(text,nlp=None, mode="document"):

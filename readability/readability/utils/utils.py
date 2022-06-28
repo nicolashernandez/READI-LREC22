@@ -98,6 +98,12 @@ def convert_text_to_sentences(text,nlp):
         text= [[token.text for token in sent] for sent in nlp(text).sents]
     return text
 
+def group_words_in_sentences(text):
+    doc = []
+    for sentence in text:
+        doc.append(' '.join(sentence))
+    return doc
+
 def count_occurences_in_document(text, spacy_filter, nlp=None, mode="text"):
     """
     Returns the numbers of articles in a text, also available per sentence by giving the argument mode="sentence"

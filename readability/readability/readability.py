@@ -328,6 +328,11 @@ class Readability:
         else:
             return -1
 
+
+    #TODO : generalize the repeated code below, this must appear at least 10 times in total and the only
+    # thing that changes is when we call the inner function and setattr (which can probably be generalized instead of hard-coding)
+    # Or just give what name to put in corpus-statistics as an argument. ezpz.
+    # Sure it's hard coding but eh. EXTREMELY less bloat.
     def average_levenshtein_distance(self,type = "old20"):
         """
         Returns the average Orthographic Levenshtein Distance 20 (OLD20), or its phonemic equivalent (PLD20).
@@ -360,7 +365,7 @@ class Readability:
         else:
             return -1
 
-
+    # NOTE : These could be grouped together in the same function, and just set an argument type="X"
     def count_pronouns(self, mode="text"):
         func = discourse.nb_pronouns
         return func(self.content,self.nlp,mode)
@@ -371,6 +376,10 @@ class Readability:
         
     def count_proper_nouns(self, mode="text"):
         func = discourse.nb_proper_nouns
+        return func(self.content,self.nlp,mode)
+
+    def lexical_cohesion_tfidf(self, mode="text"):
+        func = discourse.average_cosine_similarity_tfidf
         return func(self.content,self.nlp,mode)
 
 
