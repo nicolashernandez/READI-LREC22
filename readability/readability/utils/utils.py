@@ -123,6 +123,6 @@ def count_occurences_in_document(text, spacy_filter, nlp=None, mode="text"):
         text = convert_text_to_string(text)
         doc = nlp(text)
         prepped_doc = spacy_filter(doc,nlp)
-        return prepped_doc
+        return len(prepped_doc)
 
     raise TypeError("Type of parameter 'mode' cannot be '", type(mode),"', needs to be 'text', or 'sentence'")

@@ -32,8 +32,7 @@ from collections import Counter
 # Refer to todirascu 4.1 to view
 # Since we'll later implement a semi-partial correlation evaluation.
 
-
-#lexical cohesion measure = average cosine similarity between adjacent sentences in ONE document :
+# lexical cohesion measure = average cosine similarity between adjacent sentences in ONE document :
 # Use TF-IDF : (words | lemma | sub(nouns, proper names, pronouns)-words | sub-lemmas)
 # Use LDA as LSA equivalent : 
 # get pre-trained model(s)/data here https://fauconnier.github.io/#data
@@ -52,19 +51,10 @@ from collections import Counter
 # It might be relevant to include ways to test the importance of these features for users of this lib, maybe just provide multiple linear regression
 # and semi-partial correlation at the same time.
 
-#Following are pos tag based : 
+# Pos-tag based features : 
+# TODO : make a wrapper | decorator to indicate that these do pretty much the same thing
 def nb_pronouns(text, nlp = None, mode="text"):
-    """
-    Returns the numbers of pronouns in a text, also available per sentence by giving the argument mode="sentence"
-
-    :param text: Content of a text
-    :type text: str or list(list(str))
-    :param nlp: What natural language processor to use, currently only spacy is supported.
-    :type nlp: spacy.lang
-    :param string mode: What kind of value to return : per text or per sentence.
-    :return: Number of pronouns in a text, or average number of pronouns per sentence for this text
-    :rtype: float
-    """
+    """Returns the numbers of pronouns in a text, also available per sentence by giving the argument mode='sentence'"""
     # Pronoun tags available here, https://github.com/explosion/spaCy/blob/master/spacy/glossary.py
     spacy_pronoun_tags = ["PRON", "PRP", "PRP$", "WP", "WP$", "PDAT", "PDS", "PIAT", "PIDAT", "PIS", "PPER", "PPOSAT", "PPOSS", "PRELAT", "PRELS", "PRF", "PWAT", "PWAV", "PWS", "PN"]
 
@@ -74,22 +64,34 @@ def nb_pronouns(text, nlp = None, mode="text"):
     return utils.count_occurences_in_document(text, spacy_filter, nlp, mode)
 
 def nb_articles(text, nlp=None, mode="text"):
-    """
-    Returns the numbers of articles in a text, also available per sentence by giving the argument mode="sentence"
-
-    :param text: Content of a text
-    :type text: str or list(list(str))
-    :param nlp: What natural language processor to use, currently only spacy is supported.
-    :type nlp: spacy.lang
-    :param string mode: What kind of value to return : per text or per sentence.
-    :return: Number of pronouns in a text, or average number of pronouns per sentence for this text
-    :rtype: float
-    """
+    """Returns the numbers of articles in a text, also available per sentence by giving the argument mode='sentence'"""
     def spacy_filter(doc, nlp):
         return [token.text for token in nlp(doc) if (token.morph.get("PronType") == ["Art"])]
     return utils.count_occurences_in_document(text, spacy_filter, nlp, mode)
 
-#Entity based :
+def nb_proper_nouns(text, nlp=None, mode="text"):
+    """Returns the numbers of proper nouns in a text, also available per sentence by giving the argument mode='sentence'"""
+    def spacy_filter(doc, nlp):
+        return [token.text for token in nlp(doc) if (token.pos_ == "PROPN")]
+    return utils.count_occurences_in_document(text, spacy_filter, nlp, mode)
+
+# lexical cohesion measure = average cosine similarity between adjacent sentences in ONE document :
+# Use TF-IDF : (words | lemma | sub(nouns, proper names, pronouns)-words | sub-lemmas)
+# Use LDA as LSA equivalent : 
+# get pre-trained model(s)/data here https://fauconnier.github.io/#data
+# func exemple here https://stackoverflow.com/questions/22129943/how-to-calculate-the-sentence-similarity-using-word2vec-model-of-gensim-with-pyt
+# gensim/lda/cosine tutorials : https://github.com/nicolashernandez/teaching_nlp/blob/main/M2-CN-2021-22_03_repr%C3%A9sentation_des_textes_sac_de_mots.ipynb
+# https://github.com/nicolashernandez/teaching_nlp/blob/main/M2-CN-2021-22_04_repr%C3%A9sentation_vectorielle_continue.ipynb
+
+# Measures related to lexical cohesion :
+
+def tfidf_thing():
+    #Cosine similarity between similar sentences...
+    #project them into word space with tfidf.. sure.
+    # pure text | lemmas | sub-group text | sub-group lemma
+    # so I need to figure out how to recognize nouns and proper names and pronouns (I do for nouns and pronouns, need to check for proper names.)
+    return 0
+
 def entity_density(text,nlp=None, mode="document"):
     """
     Entity density ~~ total|average number of all/unique entities in document

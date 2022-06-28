@@ -369,7 +369,11 @@ class Readability:
         func = discourse.nb_articles
         return func(self.content,self.nlp,mode)
         
-        
+    def count_proper_nouns(self, mode="text"):
+        func = discourse.nb_proper_nouns
+        return func(self.content,self.nlp,mode)
+
+
     def stub_rsrs():
         #TODO : check sobmodule for implementation details
         return -1
