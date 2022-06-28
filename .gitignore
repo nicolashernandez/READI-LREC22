@@ -135,6 +135,7 @@ readability/test_data
 test_data
 readability/pyvenv.cfg
 pyvenv.cfg
+corpus_fauconnier.bin
 
 # Hiding library build/config files for now
 readability/LICENSE

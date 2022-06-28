@@ -55,7 +55,7 @@ def slim_lexique():
     print("saved slimmer lexique in data/lexique/")
     return 0
 
-def average_levenshtein_distance(text, nlp=None, typ = "old20"):
+def average_levenshtein_distance(text, nlp=None, mode = "old20"):
     """
     Returns the average Orthographic Levenshtein Distance 20 (old20), or its phonemic equivalent (pld20).
     Currently using the Lexique 3.0 database for French texts, version 3.83. More details here : http://www.lexique.org/
@@ -66,7 +66,7 @@ def average_levenshtein_distance(text, nlp=None, typ = "old20"):
     :type text: str or list(list(str))
     :param nlp: What natural language processor to use, currently only spacy is supported.
     :type nlp: spacy.lang
-    :param string typ: What value to return, old20 or pld20.
+    :param string mode: What value to return, old20 or pld20.
     :return: Average of old20 or pld20 for each word in current text
     :rtype: float
     """
@@ -84,7 +84,7 @@ def average_levenshtein_distance(text, nlp=None, typ = "old20"):
     recognized_word_count = len(counter)
     #TODO : need to check if printing the warnings takes a lot of time or not.. probably so.
 
-    if typ == "old20":
+    if mode == "old20":
         for element in counter:
             # Check if element is contained in list before calculating old20/old20.
             if element in df['ortho'].values:
@@ -93,7 +93,7 @@ def average_levenshtein_distance(text, nlp=None, typ = "old20"):
             else:
                 #print("WARNING: Skipping word", element, "appearing", counter[element], "times because it isn't recognized in the lexique database")
                 recognized_word_count -= 1
-    elif typ == "pld20":
+    elif mode == "pld20":
         for element in counter:
             # Check if element is contained in list before calculating old20/old20.
             if element in df['ortho'].values:
@@ -108,7 +108,7 @@ def average_levenshtein_distance(text, nlp=None, typ = "old20"):
                 #print("WARNING: Skipping word", element, "appearing", counter[element], "times because it isn't recognized in the lexique database")
                 recognized_word_count -= 1
     else:
-        raise ValueError("Parameter 'type' with value", typ, "is not supported, please provide one of the following values instead : 'old20', 'pld20'")
+        raise ValueError("Parameter 'type' with value", mode, "is not supported, please provide one of the following values instead : 'old20', 'pld20'")
 
     return average_value / recognized_word_count
     

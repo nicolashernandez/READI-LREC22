@@ -333,7 +333,7 @@ class Readability:
     # thing that changes is when we call the inner function and setattr (which can probably be generalized instead of hard-coding)
     # Or just give what name to put in corpus-statistics as an argument. ezpz.
     # Sure it's hard coding but eh. EXTREMELY less bloat.
-    def average_levenshtein_distance(self,type = "old20"):
+    def average_levenshtein_distance(self,mode = "old20"):
         """
         Returns the average Orthographic Levenshtein Distance 20 (OLD20), or its phonemic equivalent (PLD20).
         Currently using the Lexique 3.0 database for French texts, version 3.83. More details here : http://www.lexique.org/
@@ -348,17 +348,17 @@ class Readability:
         # Might need to make a function called average_levenshtein_distance_corpus() if it's worth the time gain
         func = word_list_based.average_levenshtein_distance
         if self.content_type == "text":
-            return func(self.content,self.nlp,type)
+            return func(self.content,self.nlp,mode)
         elif self.content_type == "corpus":
             scores = {}
             for level in self.classes:
                 temp_score = 0
                 scores[level] = []
                 for index,text in enumerate(self.content[level]):
-                    scores[level].append(func(text, self.nlp, type))
+                    scores[level].append(func(text, self.nlp, mode))
                     temp_score += scores[level][index]
                     if hasattr(self, "corpus_statistics"):
-                        setattr(self.corpus_statistics[level][index],locals()['type'],scores[level][index])
+                        setattr(self.corpus_statistics[level][index],locals()['mode'],scores[level][index])
                 temp_score = temp_score / len(scores[level])
                 print("class", level, "mean score :" ,temp_score)
             return scores
@@ -380,6 +380,11 @@ class Readability:
 
     def lexical_cohesion_tfidf(self, mode="text"):
         func = discourse.average_cosine_similarity_tfidf
+        return func(self.content,self.nlp,mode)
+
+    # NOTE: this seem to output the same values, whether we use text or lemmas, probably due to the type of model used.
+    def lexical_cohesion_LDA(self, mode="text"):
+        func = discourse.average_cosine_similarity_LDA
         return func(self.content,self.nlp,mode)
 
 
