@@ -82,3 +82,47 @@ def convert_text_to_string(text):
     elif isinstance(text, list):
         doc = ' '.join(text)
     return doc
+
+def convert_text_to_sentences(text,nlp):
+    # Convert string to list(list(str))
+    if isinstance(text, str):
+        text = [[token.text for token in sent] for sent in nlp(text).sents]
+
+    # Handling text that doesn't need to be converted
+    elif any(isinstance(el, list) for el in text):
+        pass
+
+    # Handling text that was only converted into tokens (just list())
+    elif isinstance(text, list):
+        text = ' '.join(text)
+        text= [[token.text for token in sent] for sent in nlp(text).sents]
+    return text
+
+def count_occurences_in_document(text, spacy_filter, nlp=None, mode="text"):
+    """
+    Returns the numbers of articles in a text, also available per sentence by giving the argument mode="sentence"
+
+    :param text: Content of a text
+    :type text: str or list(list(str))
+    :param nlp: What natural language processor to use, currently only spacy is supported.
+    :type nlp: spacy.lang
+    :param string mode: What value to return, old20 or pld20.
+    :return: Number of pronouns in a text, or average number of pronouns per sentence for this text
+    :rtype: float
+    """
+    if mode == "sentence":
+        text = convert_text_to_sentences(text, nlp)
+        counter = 0
+        for sentence in text:
+            doc = nlp(' '.join(sentence))
+            prepped_doc = spacy_filter(doc,nlp)
+            counter += len(prepped_doc)
+        return (counter / len(text))
+
+    elif mode == "text":
+        text = convert_text_to_string(text)
+        doc = nlp(text)
+        prepped_doc = spacy_filter(doc,nlp)
+        return prepped_doc
+
+    raise TypeError("Type of parameter 'mode' cannot be '", type(mode),"', needs to be 'text', or 'sentence'")

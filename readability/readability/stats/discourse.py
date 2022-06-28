@@ -1,8 +1,7 @@
 """
 The discourse module contains functions allowing to calculate notions related to text cohesion.
-In this case, text cohesion means how a text is represented by explicit formal grammatical ties.
-Aka how are parts of the text related to each other.
-The following features can be measured : co-reference, anaphoric chains, entity density and specific cohesion features (lexical too)
+Text cohesion means how parts of a text are related with explicit formal grammatical ties.
+The following features can be measured : co-reference | anaphoric chains, entity density and specific cohesion features (lexical too)
 and POS-tag based cohesion measures.
 """
 import math
@@ -11,7 +10,7 @@ from collections import Counter
 
 # Paper by A.Todirascu freely available here in case I need more details : https://hal.archives-ouvertes.fr/hal-01430554/document
 
-# Discourse cohesion features :
+# Discourse cohesion features (Martinc):
 # Coherence ~~ is text more than collection of unrelated sentences
 # Cohesion : text represented by explicit formal grammatical ties aka how are parts related to each other
 # Cohesion => co-reference, anaphoric chains, entity density and cohesion features, lexical cohesion measures,
@@ -50,45 +49,45 @@ from collections import Counter
 # Use a tool called RefGen for French? (longo & todirascu 2010,2013), however it can't recognize resumptive anaphora, and can't do complex referents
 # like groups or collections of objects. also it ignores adverbs, and only identifies simple cases of antecedance.
 
-# It might be relevant to include ways to test the importance of these futures for users of this lib, maybe just provide multiple linear regression
+# It might be relevant to include ways to test the importance of these features for users of this lib, maybe just provide multiple linear regression
 # and semi-partial correlation at the same time.
 
-
-# NOTE Can probably just use spacy for these
-
-def stub_cohesion():
-    """
-    Reminder : Cohesion : text represented by explicit formal grammatical ties aka how are parts related to each other
-    We'll put functions that are base itself on grammar, like "number of (personal) pronouns), number of articles, lexical cohesion, etc..
-    """
-    func_1 = nb_pronouns
-    return 0
-
 #Following are pos tag based : 
-def nb_pronouns(text, nlp = None):
+def nb_pronouns(text, nlp = None, mode="text"):
     """
-    NOTE : Spacy isn't that great at recognizing French pronouns, try to find an alternative, NLTK or a tool developped by a researcher
-    Or try another spacy model.
-    """
-    doc = utils.convert_text_to_string(text)
+    Returns the numbers of pronouns in a text, also available per sentence by giving the argument mode="sentence"
 
-    #Only the first one will be recognized by the French model, source here : https://github.com/explosion/spaCy/blob/master/spacy/glossary.py
-    list_tags = ["PRON", "PRP", "PRP$", "WP", "WP$", "PDAT", "PDS", "PIAT", "PIDAT", "PIS", "PPER", "PPOSAT", "PPOSS", "PRELAT", "PRELS", "PRF", "PWAT", "PWAV", "PWS", "PN"]
-    trucs = nlp(doc)
-    for truc in trucs:
-        print(truc.text,truc.pos_,truc.tag_, truc.dep_)
-        print(truc.morph)
-        print(truc.morph.get("PronType"))
-
-    #for ent in trucs.ents:
-    #    print(ent.text, ent.start_char, ent.end_char, ent.label_)
-    return 0
-
-def nb_articles(text,nlp=None):
+    :param text: Content of a text
+    :type text: str or list(list(str))
+    :param nlp: What natural language processor to use, currently only spacy is supported.
+    :type nlp: spacy.lang
+    :param string mode: What kind of value to return : per text or per sentence.
+    :return: Number of pronouns in a text, or average number of pronouns per sentence for this text
+    :rtype: float
     """
-    Need to check if Spacy recognizes articles properly, if so then no problems.
+    # Pronoun tags available here, https://github.com/explosion/spaCy/blob/master/spacy/glossary.py
+    spacy_pronoun_tags = ["PRON", "PRP", "PRP$", "WP", "WP$", "PDAT", "PDS", "PIAT", "PIDAT", "PIS", "PPER", "PPOSAT", "PPOSS", "PRELAT", "PRELS", "PRF", "PWAT", "PWAV", "PWS", "PN"]
+
+    def spacy_filter(doc, nlp):
+        return [token.text for token in nlp(doc) if (token.pos_ in spacy_pronoun_tags)]
+    
+    return utils.count_occurences_in_document(text, spacy_filter, nlp, mode)
+
+def nb_articles(text, nlp=None, mode="text"):
     """
-    return 0
+    Returns the numbers of articles in a text, also available per sentence by giving the argument mode="sentence"
+
+    :param text: Content of a text
+    :type text: str or list(list(str))
+    :param nlp: What natural language processor to use, currently only spacy is supported.
+    :type nlp: spacy.lang
+    :param string mode: What kind of value to return : per text or per sentence.
+    :return: Number of pronouns in a text, or average number of pronouns per sentence for this text
+    :rtype: float
+    """
+    def spacy_filter(doc, nlp):
+        return [token.text for token in nlp(doc) if (token.morph.get("PronType") == ["Art"])]
+    return utils.count_occurences_in_document(text, spacy_filter, nlp, mode)
 
 #Entity based :
 def entity_density(text,nlp=None, mode="document"):

@@ -97,48 +97,28 @@ class Readability:
             self.nlp = None
         
         # Handling text that needs to be converted into lists of tokens
-        # NOTE: maybe allow removing punctuation by checking token.is_punct as a parameter
-        # TODO: make a "convert_text_to_lists" function in utils
-        if isinstance(content, str):
-            self.content_type = "text"
-            self.content = [[token.text for token in sent] for sent in self.nlp(content).sents]
-            #self.content = [[token.text for token in sent if not token.is_punct] for sent in self.nlp(content).sents]
-            nb_words = 0
-            for sentence in self.content:
-                nb_words += len(sentence)
-            if nb_words < 101:
-                print("WARNING : Text length is less than 100 words, some scores will be inaccurate.")
-
-        # Handling text that doesn't need to be converted
-        elif any(isinstance(el, list) for el in content):
-            self.content_type = "text"
-            self.content = content
-
-        # Handling text that was only converted into tokens
-        elif isinstance(content, list):
-            self.content_type = "text"
-            content = ' '.join(content)
-            self.content = [[token.text for token in sent] for sent in self.nlp(content).sents]
-            #self.content = [[token.text for token in sent if not token.is_punct] for sent in self.nlp(content).sents]
-            nb_words = 0
-            for sentence in self.content:
-                nb_words += len(sentence)
-            if nb_words < 101:
-                print("WARNING : Text length is less than 100 words, some scores will be inaccurate.")
+        self.content_type = "text"
+        self.content = utils.convert_text_to_sentences(content,self.nlp)
 
         # Handling corpus that probably is a corpus
-        else:
-            # Reminder, structure needed is : dict => list of texts => list of sentences => list of words
-            # TODO : check this with a bunch of edge cases
-            if type(content) == dict:
-                if isinstance(content[list(content.keys())[0]], list):
-                    if isinstance(content[list(content.keys())[0]][0], list):
-                        if isinstance(content[list(content.keys())[0]][0][0], list):
-                            self.content_type = "corpus"
-                            self.content = content
-                            self.classes = list(content.keys())
+        # Reminder, structure needed is : dict => list of texts => list of sentences => list of words
+        # TODO : check this with a bunch of edge cases
+        if type(content) == dict:
+            if isinstance(content[list(content.keys())[0]], list):
+                if isinstance(content[list(content.keys())[0]][0], list):
+                    if isinstance(content[list(content.keys())[0]][0][0], list):
+                        self.content_type = "corpus"
+                        self.content = content
+                        self.classes = list(content.keys())
             #else, check if the structure is dict[class][text].. and tokenize everything (warn user it'll take some time)
             #and then use that as the new structure
+        
+        if self.content_type == "text":
+            nb_words = 0
+            for sentence in self.content:
+                nb_words += len(sentence)
+            if nb_words < 101:
+                print("WARNING : Text length is less than 100 words, some scores will be inaccurate.")
         
 
         # This is a dictionary that maps values that can be obtained from the readability class with the functions used to calculate them.
@@ -381,12 +361,15 @@ class Readability:
             return -1
 
 
-    def stub_discourse(self):
+    def count_pronouns(self, mode="text"):
         func = discourse.nb_pronouns
-        return func(self.content,self.nlp)
-        return -1
-
-
+        return func(self.content,self.nlp,mode)
+    
+    def count_articles(self, mode="text"):
+        func = discourse.nb_articles
+        return func(self.content,self.nlp,mode)
+        
+        
     def stub_rsrs():
         #TODO : check sobmodule for implementation details
         return -1
