@@ -385,7 +385,13 @@ class Readability:
     # NOTE: this seem to output the same values, whether we use text or lemmas, probably due to the type of model used.
     def lexical_cohesion_LDA(self, mode="text"):
         func = discourse.average_cosine_similarity_LDA
-        return func(self.content,self.nlp,mode)
+
+        # ok so for our thing there are two things we need to pass
+        # 1) the function alongside the needed arguments
+        # 2) what name to give it for .corpus_statistics purposes. aka re-use for faster execution | use it in .scores() function eventually
+        #return func(self.content,self.nlp,mode)
+
+        return self.stub_generalize_get_score(func, (self.nlp,mode), "score_lda")
 
 
     def stub_rsrs():
@@ -510,6 +516,37 @@ class Readability:
             print("New number of texts for class", level, ":", len(corpus_no_outliers[level]))
         print("In order to use this new corpus, you'll have to make a new Readability instance.")
         return corpus_no_outliers
+
+
+    def stub_generalize_get_score(self, func, func_args , score_name):
+        """
+        Stub for functions that do the same logic when calculating a score and then potentially assign it to .corpus_statistics or else
+
+        func is just a reference to the function
+        func_args_text will be a tuple or list with the needed arguments for a text.
+        func_args_corpus will be the same, when we're dealing with a corpus
+        score_name is self_explanatory, instead of trying to deduce a score_name from the function or the parameters, just allow to pass it 
+        """
+        if self.content_type == "text":
+            print(func_args)
+            print(*(func_args))
+            return func(self.content, *(func_args))
+        #^ this should unpack tuple into several arguments... probably.
+        elif self.content_type == "corpus":
+            scores = {}
+            for level in self.classes:
+                temp_score = 0
+                scores[level] = []
+                for index,text in enumerate(self.content[level]):
+                    scores[level].append(func(text, *(func_args)))
+                    temp_score += scores[level][index]
+                    if hasattr(self, "corpus_statistics"):
+                        setattr(self.corpus_statistics[level][index],score_name,scores[level][index])
+                temp_score = temp_score / len(scores[level])
+                print("class", level, "mean score :" ,temp_score)
+            return scores
+        else:
+            return -1
 
 
     def compile(self):

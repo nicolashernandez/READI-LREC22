@@ -55,6 +55,7 @@ from gensim.matutils import cossim
 
 spacy_pronoun_tags = ["PRON", "PRP", "PRP$", "WP", "WP$", "PDAT", "PDS", "PIAT", "PIDAT", "PIS", "PPER", "PPOSAT", "PPOSS", "PRELAT", "PRELS", "PRF", "PWAT", "PWAV", "PWS", "PN"]
 DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
+fauconnier_model = None
 
 # Pos-tag based features : 
 # TODO : make a wrapper | decorator to indicate that these do pretty much the same thing
@@ -137,17 +138,23 @@ def average_cosine_similarity_LDA(text, nlp = None, mode="text"):
     By using the 'mode' parameter, can use inflected forms of words or their lemmas.
     Valid values for mode are : 'text', 'lemma'.
     """
+    global fauconnier_model
     # Get French word2vecmodel from Jean Phillipe Fauconnier : https://fauconnier.github.io/#data
-    try:
-        with open(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), "rb") as f:
+    if fauconnier_model is None:
+        try:
+            with open(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), "rb") as f:
+                model = KeyedVectors.load_word2vec_format(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), binary=True, unicode_errors="ignore")
+                fauconnier_model = model
+        except IOError:
+            url = "https://embeddings.net/embeddings/frWac_no_postag_no_phrase_500_cbow_cut100.bin"
+            print("WARNING : Acquiring french word2vec model remotely since model was not found locally.")
+            response = requests.get(url)
+            with open(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), "wb") as f:
+                f.write(response.content)
             model = KeyedVectors.load_word2vec_format(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), binary=True, unicode_errors="ignore")
-    except IOError:
-        url = "https://embeddings.net/embeddings/frWac_no_postag_no_phrase_500_cbow_cut100.bin"
-        print("WARNING : Acquiring french word2vec model remotely since model was not found locally.")
-        response = requests.get(url)
-        with open(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), "wb") as f:
-            f.write(response.content)
-        model = KeyedVectors.load_word2vec_format(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), binary=True, unicode_errors="ignore")
+            fauconnier_model = model
+    else:
+        model = fauconnier_model
 
     # Group sentences together and keep text or lemmas
     sentences = utils.convert_text_to_sentences(text, nlp)
@@ -165,6 +172,7 @@ def average_cosine_similarity_LDA(text, nlp = None, mode="text"):
     for sentence_tokens in sentences:
         doc = ' '.join(sentence_tokens)
         prepped_text.append(spacy_filter(doc,nlp))
+    print(prepped_text)
 
     # Convert sentences into BOW vectors
     dictionary = corpora.Dictionary(prepped_text)
@@ -175,9 +183,13 @@ def average_cosine_similarity_LDA(text, nlp = None, mode="text"):
 
     # Average the cosine_similarity value between each adjacent sentence
     average_cosine_similarity = 0
-    for index in range(len(text_vectors[:-1])):
-        average_cosine_similarity = cossim(text_vectors[index], text_vectors[index+1])
-    average_cosine_similarity = average_cosine_similarity / len(text_vectors[:-1])
+    # TODO: Handle texts that only have one sentence in them somehow.
+    if len(text_vectors[:-1]) > 0:
+        for index in range(len(text_vectors[:-1])):
+            average_cosine_similarity = cossim(text_vectors[index], text_vectors[index+1])
+        average_cosine_similarity = average_cosine_similarity / len(text_vectors[:-1])
+    else:
+        average_cosine_similarity = 0
 
     return average_cosine_similarity
 
