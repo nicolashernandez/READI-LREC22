@@ -16,6 +16,7 @@ from .utils import utils
 from .stats import diversity, perplexity, common_scores, word_list_based, syntactic, discourse, rsrs
 from .methods import methods
 from .models import bert, fasttext, models
+from .parsed_text import parsed_text
 
 # Checklist :
 #     Remake structure to help differenciate between functions : ~ I think it's okay but I need some feedback
@@ -268,6 +269,9 @@ class Readability:
             self.dependencies[dependency] = utils.load_dependency(dependency)
 
     def load(self,value):
+        """
+        TODO: doc
+        """
         # Based on the value's name, check if exists in self.excluded_informations, return error or warning if so:
         if value in list(self.excluded_informations.keys()):
             # Transpose back to self.informations
@@ -286,6 +290,13 @@ class Readability:
             # Raise error to tell user this measure isn't recognized
             raise ValueError("Value",value,"was not recognized as par of instance.informations or instance.excluded_informations, Please check if you've done a typo.")
         return 0
+    
+    def parse(self,text):
+        """
+        TODO: doc
+        """
+        #WELP TIME TO SEE WHAT HAPPENS
+        return parsed_text.ParsedText(text,self)
 
     def score(self, name):
         """

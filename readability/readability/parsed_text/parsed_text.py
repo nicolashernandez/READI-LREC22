@@ -47,7 +47,7 @@ class ParsedText:
         self.readability_processor = readability_processor
 
         # Converting text into a list(list(str)) format in order to properly seperate sentences and tokens.
-        self.content = utils.convert_text_to_sentences(content,self.nlp)
+        self.content = utils.convert_text_to_sentences(content,readability_processor.nlp)
 
         self.scores = dict() # Scores don't get initialized since
         self.statistics = dict()
