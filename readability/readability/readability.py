@@ -237,7 +237,7 @@ class Readability:
             fkgl=dict(function=self.fkgl,dependencies=[]),
             smog=dict(function=self.smog,dependencies=[]),
             rel=dict(function=self.rel,dependencies=[]),
-            perplexity=dict(function=self.perplexity,dependencies=["GPT2_LM"]),
+            pppl=dict(function=self.perplexity,dependencies=["GPT2_LM"]),
             dubois_buyse_ratio=dict(function=self.dubois_proportion,dependencies=["dubois_dataframe"]),
             ttr=dict(function=self.diversity,dependencies=[]),
             ntr=dict(function=self.diversity,dependencies=[]),
@@ -267,15 +267,24 @@ class Readability:
         for dependency in dependencies_to_add:
             self.dependencies[dependency] = utils.load_dependency(dependency)
 
-    def load(value):
-        #TODO
-        # Based on the value's name, check if exists in self.excluded, return error or warning if so:
+    def load(self,value):
+        # Based on the value's name, check if exists in self.excluded_informations, return error or warning if so:
+        if value in list(self.excluded_informations.keys()):
+            # Transpose back to self.informations
+            self.informations[value] = self.excluded_informations[value]
+            del self.excluded_informations[value]
+            # Check if there's a dependency, and handle it if wasn't imported already
+            for dependency in self.informations[value]["dependencies"]:
+                if dependency not in list(self.dependencies.keys()):
+                    self.dependencies[dependency] = utils.load_dependency(dependency)
 
-        # If exists in self.excluded_information : transpose back to self.informations
-        
-        # Then check if there's a dependency : If so, then check if it exists in self.dependencies
-
-        # If not, then just call self.dependencies[dependency] = utils.load_dependency(dependency)
+        elif value in list(self.informations.keys()):
+            # Check if it's in self.informations to tell user it's already loaded
+            print("No need to call .load(",value,"), value already exists in instance.informations[",value,"]",sep="")
+            print(self.informations[value])
+        else:
+            # Raise error to tell user this measure isn't recognized
+            raise ValueError("Value",value,"was not recognized as par of instance.informations or instance.excluded_informations, Please check if you've done a typo.")
         return 0
 
     def score(self, name):
