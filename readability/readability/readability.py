@@ -108,22 +108,26 @@ from .models import bert, fasttext, models
 #non adhérente au format corpus (dict…) qui traite une mesure pour une liste de texte (sans notion de classe)  
 
 
-# Fonctionnement de la librarie détaillée :
+# Suggestion de factorisation de la librarie à implémenter :
 
-# D'abord d'initaliser un readability_processor en excluant certains modèles et en précisant la langue (bon seulement le français fonctionne pour l'instant).
+# D'abord, initaliser un readability_processor en excluant certain scores.
 # => readability_processor = readability.Readability(lang = "fr", exclude = ["pppl","other_score","abc"]):
-# On suppose que l'on cherche ensuite chaque score indiquée dans un objet methods, qui associe chaque score à une fonction de calcul, et possiblement un modèle.
-# Si detection, on transpose ces associations dans un objet excluded_methods.
-# On regarde ensuite tout les modèles conservés dans l'objet methodes : d'aprés ce qui reste, le processeur charge les modèles et prépare le nécessaire.
+# On suppose que l'on cherche ensuite chaque score indiqué dans un objet informations, qui associe chaque score à une fonction , et potentiellement une ressource externe, tel un modèle de langue
+# Si detection, on transpose ces informations dans un objet excluded_informations (et on enlève dans informations)
+# On regarde ensuite tout les scores conservés dans l'objet informations : d'aprés ce qui reste, le processeur charge les ressources et prépare le nécessaire.
+# ^ Je compte implémenter cela avec un dictionnaire de type : {scoreX : {nom_fonction : X, dependences:[a,b,c]}}
 
-# L'utilisateur décide de traiter un texte :
-# => pt1 = readability_processor.parse(text1) #renvoie un objet parsedText, dont un attribut est une reference à readability_processor
-# Je suppose que deux objets peuvent partager la même instance mais on verra lors du développement.
+# Ensuite, l'utilisateur décide de traiter un texte :
+# => pt1 = readability_processor.parse(text1) #renvoie un objet parsedText, dont l'attribut readability_processor est une reference une instance partagée.
+# Je suppose que deux objets peuvent "partager" la même instance mais on verra lors du développement.
 # Lors de l'execution de .parse(), pt1 génére une liste de mesures utiles pour différentes méthodes : reprise du code actuel r.compile()
-# L'utilisateur peut faire pt1.show_values() et ça renvoie un tableau contenant tout les scores calculables, ou déja calculés :
-# On regarde d'abord chaque score calculé dans une liste pt1.scores["score"]
-# Et on regarde ce qui est disponible dans methods dans pt1.r, on décide de calculer ou non et d'ajouter à la liste NA ou NaN si cela n'est pas le cas.
-# Pour le reste inclus dans excluded_methods, on ajoute à la liste en indiquant NA ou NaN.
+
+# L'utilisateur peut faire pt1.show_values(force_calculation=False) et cela renvoie un tableau contenant tout les scores calculables, ou déja calculés :
+# On regarde d'abord chaque score calculé ou non dans un dictionnaire pt1.scores
+# Si rencontre d'un score non calculé, et qu'on active force_calculation au préalable:
+#   On cherche ce score apparaît dans pt1.readability_processor.informations, on appelle la fonction correspondant, on calcule ce score et on l'ajoute au tableau.
+# Sinon, ou pour le reste des scores qui n'appairaissent pas dans readability_processor.informations (car exclus), on ajoute à la liste en indiquant NA ou NaN.
+
 # L'utilisateur peut décider de recupérer un score en particulier en appelant la fonction :
 # => pppl = pt1.perplexity()
 # Dans ce cas, on fait une vérification (if pt1.score['pppl'] == None : do the function otherwise return the score).
@@ -144,13 +148,14 @@ class Readability:
 
     In its current state, scores are meant to be used with the French language, but this can change in the future.
     """
-    def __init__(self, content, lang = "fr", nlp = "spacy_sm", perplexity_processor = "gpt2"):
+    def __init__(self, content, exclude = [""], lang = "fr", nlp = "spacy_sm", perplexity_processor = "gpt2",):
         """
         Constructor of the Readability class, won't return any value but creates the attributes :
         self.content, self.content_type, self.nlp, self.lang, and self.classes only if input is a corpus.
 
         :param content: Content of a text, or a corpus
         :type content: str, list(str), list(list(str)), converted into list(list(str)) or dict[class][text][sentence][token]
+        :param list(str) exclude: List of type of scores to exclude, compared to the informations object to possibly remove unused dependencies
         :param str lang: Language the text was written in, in order to adapt some scores.
         :param str nlp: Type of NLP processor to use, indicated by a "type_subtype" string.
         :param str perplexity_processor: Type of processor to use for the calculation of pseudo-perplexity
@@ -222,6 +227,56 @@ class Readability:
                 old20=self.average_levenshtein_distance,
                 pld20=self.average_levenshtein_distance)
             )
+
+        # TODO: Factorising the library, first we define every possible (score,function,dependency) combination
+        # Keys are names of values that can be calculated by the library.
+        self.informations = dict(
+            gfi=dict(function=self.gfi,dependencies=[]),
+            ari=dict(function=self.ari,dependencies=[]),
+            fre=dict(function=self.fre,dependencies=[]),
+            fkgl=dict(function=self.fkgl,dependencies=[]),
+            smog=dict(function=self.smog,dependencies=[]),
+            rel=dict(function=self.rel,dependencies=[]),
+            perplexity=dict(function=self.perplexity,dependencies=["GPT2_LM"]),
+            dubois_buyse_ratio=dict(function=self.dubois_proportion,dependencies=["dubois_dataframe"]),
+            ttr=dict(function=self.diversity,dependencies=[]),
+            ntr=dict(function=self.diversity,dependencies=[]),
+            old20=dict(function=self.average_levenshtein_distance,dependencies=["lexique_dataframe"]),
+            pld20=dict(function=self.average_levenshtein_distance,dependencies=["lexique_dataframe"]),
+            #following are stubs since it isn't 100% implemented
+            bert_value=dict(function=self.stub_BERT,dependencies=["BERT"]),
+            fasttext_value=dict(function=self.stub_fastText,dependencies=["fastText"]),
+            rsrs=dict(function=self.stub_rsrs,dependencies=["GPT2_LM"])
+        )
+        self.excluded_informations = dict()
+
+        # Then remove things in self.informations based on what's in the exclude argument
+        for value in list(self.informations.keys()):
+            if value in exclude:
+                self.excluded_informations[value] = self.informations[value]
+                del self.informations[value]
+        
+        # Then iterate over what's remaining in self.informations to see what dependencies are needed:
+        dependencies_to_add = set()
+        for information in self.informations.values():
+            for dependency in information["dependencies"]:
+                dependencies_to_add.add(dependency)
+
+        #Create a dependencies dictionary, and put what's needed in there after loading the external ressources
+        self.dependencies = {}
+        for dependency in dependencies_to_add:
+            self.dependencies[dependency] = utils.load_dependency(dependency)
+
+    def load(value):
+        #TODO
+        # Based on the value's name, check if exists in self.excluded, return error or warning if so:
+
+        # If exists in self.excluded_information : transpose back to self.informations
+        
+        # Then check if there's a dependency : If so, then check if it exists in self.dependencies
+
+        # If not, then just call self.dependencies[dependency] = utils.load_dependency(dependency)
+        return 0
 
     def score(self, name):
         """
@@ -323,6 +378,7 @@ class Readability:
             return values
 
 
+    #TODO : redo this to be in line with other functions
     def perplexity(self):
         """
         Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.

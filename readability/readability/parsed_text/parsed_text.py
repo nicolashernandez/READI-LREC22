@@ -59,11 +59,11 @@ class ParsedText:
     def show_scores(self,force=False):
         # TODO : Create a dataframe, append each already-calculated score
         # Then if force=True => for every non-calculated score =>
-        #   Check if score appears in .readability_processor.methods:
+        #   Check if score appears in .readability_processor.informations:
         #       Calculate that score and append to dataframe
-        # Otherwise, append each score but add NaN or NA or something similar
-        # Then for every other score in .readability_processor.excluded_methods:
-        #   Append each of these scores but with Nan or NA
+        #       Else put NA or NaN
+        # Otherwise for force=false append each remaining score but add NaN or NaN
+        # Then sort dataframe by name?
         # No need to store the dataframe since checking if scores appear in dict should take a miniscule amount of time
         return -1
 

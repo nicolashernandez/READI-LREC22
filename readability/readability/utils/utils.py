@@ -4,6 +4,8 @@ or things that are useful in order to reproduce the contents of the READI paper.
 """
 import pickle
 import os
+from transformers import GPT2Tokenizer, GPT2LMHeadModel
+import torch
 from unidecode import unidecode
 
 
@@ -132,3 +134,33 @@ def count_occurences_in_document(text, spacy_filter, nlp=None, mode="text"):
         return len(prepped_doc)
 
     raise TypeError("Type of parameter 'mode' cannot be '", type(mode),"', needs to be 'text', or 'sentence'")
+
+
+def load_dependency(dependency_name):
+    #TODO : go get every dependency import/configuration thing and return a dictionary of what's needed
+    #It'll go in ReadabilityProcessor.dependencies[dependency] and can be accessed by other functions.
+    if dependency_name == "GPT2_LM":
+        model_name = "asi/gpt-fr-cased-small"
+        # Load pre-trained model (weights)
+        with torch.no_grad():
+                model = GPT2LMHeadModel.from_pretrained(model_name)
+                model.eval()
+        # Load pre-trained model tokenizer (vocabulary)
+        tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+        return dict(model_name=model_name,
+                    model=model,
+                    tokenizer=tokenizer,
+                    max_length=100,
+                    model_loaded = True)
+    elif dependency_name == "dubois_dataframe":
+        return dict(dummy_var="dummy_value")
+    elif dependency_name == "lexique_dataframe":
+        return dict(dummy_var="dummy_value")
+    elif dependency_name == "BERT":
+        return dict(dummy_var="dummy_value")
+    elif dependency_name =="fastText":
+        return dict(dummy_var="dummy_value")
+    else:
+        raise ValueError("Dependency '",dependency_name,"' was not recognized as a valid dependency.",sep="")
+
+    return 0
