@@ -43,15 +43,33 @@ class ParsedText:
         """
         # NOTE: Maybe I should keep the str and list(str) variants of the text content stored in .statistics in order to re-use it later
         # Instead of potentially converting from sentences to text or from text to sentences several times.
-        self.content = content
         self.readability_processor = readability_processor
 
         # Converting text into a list(list(str)) format in order to properly seperate sentences and tokens.
         self.content = utils.convert_text_to_sentences(content,readability_processor.nlp)
 
-        self.scores = dict() # Scores don't get initialized since
+        # Initialize scores by setting them all to None
+        self.scores = dict()
+        for info in list(readability_processor.informations.keys()):
+            self.scores[info] = None
+        for info in list(readability_processor.excluded_informations.keys()):
+            self.scores[info] = None
+
         self.statistics = dict()
-        #TODO : put what's in readability.compile() here.
+        self.statistics["totalWords"] = 0
+        self.statistics["totalLongWords"] = 0
+        self.statistics["totalSentences"] = len(self.content)
+        self.statistics["totalCharacters"] = 0
+        self.statistics["totalSyllables"] = 0
+        self.statistics["nbPolysyllables"] = 0
+        for sentence in self.content:
+            self.statistics["totalWords"] += len(sentence)
+            self.statistics["totalLongWords"] += len([token for token in sentence if len(token)>6])
+            self.statistics["totalCharacters"] += sum(len(token) for token in sentence)
+            self.statistics["totalSyllables"] += sum(utils.syllablesplit(word) for word in sentence)
+            #wait why the fuck does this give me 0 syllables?
+            self.statistics["nbPolysyllables"] += sum(utils.syllablesplit(word) for word in sentence if utils.syllablesplit(word)>=3)
+            #self.statistics["nbPolysyllables"] += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
     
     def show_text(self):
         return utils.convert_text_to_string(self.content)
@@ -73,18 +91,20 @@ class ParsedText:
 
 
     # NOTE : Explicitely naming each of the functions but probably exists a better way to set certain function names from the ReadabilityProcessor instance
-    # Exemple, perplexity :
+    # Directly calling them from self.readability_processor.information[value][function] could be possible
+    # The only problem is that some of them take different number of arguments, or different types of arguments, so i'll just explicitly
+    # put them here just in case.
+    # I suppose I could make a call_function(func_args) subroutine, but I wonder what happens if func_args is empty
+    # Does doing *(func_args) result in nothing, or is an empty argument added?
+
     def perplexity(self):
         if self.scores["pppl"] == None:
             self.scores["pppl"] = self.readability_processor.perplexity()
         return self.scores["pppl"]
 
-    # Should work even with functions that need arguments :
-    # Reminder that type is 'ttr' or 'ntr', mode is 'corrected' or 'root' or defaulting to 'normal'
-    # Probably a better idea to just make a ttr() and ntr() function instead to avoid confusion down the line.
     def diversity(self, type, mode=None):
         if self.scores["pppl"] == None:
-            self.scores["pppl"] = self.readability_processor.perplexity(type, mode)
+            self.scores["pppl"] = self.readability_processor.diversity(type, mode)
         return self.scores["pppl"]
 
     # I probably could make a call_function(func_args) subroutine, but what happens if func_args is empty, does it add nothing or does it break.

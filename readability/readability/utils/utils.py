@@ -50,7 +50,7 @@ def syllablesplit(input):
     syllables='aeiouy'
     for char in input:
         for syl in syllables:
-            if syl == unidecode(char):
+            if syl == unidecode(char.lower()):
                 nb_syllabes+=1
                 break
     return nb_syllabes
