@@ -37,6 +37,9 @@ from .models import bert, fasttext, models
 #     Ajouter une fonction pour générer tableau récap des features disponibles (ou celles déja calculées aprés .compile())
 #     Permettre de calculer scores|correlations en + automatiquement (Calculer scores de corr pour features cohesion (1er corpus minimum))
 #     Ajouter mesure de semi-partial correlation
+#     Factoriser appels NLP/models pour être sûr qu'on ne duplique pas de ressources
+#     Séparer initialisation object Readi | Parsing de texte
+# parse lis un dict measures (ce dict measures contient ce qui est dispo selon l'init du readability processor, un dict avec 3 truc : 'possible', 'pas_possible')
 
 # Extra (not urgent) :
 #     Add more corpuses such as vikidia or wikimini : X (will probably start june 22 afternoon) :
@@ -47,6 +50,85 @@ from .models import bert, fasttext, models
 # FIXME : several formulas are incorrect, as outlined in the submodule stats/common_scores.
 # These being GFI, ARI due to wrong formulas, SMOG due to an error in calculating polysyllables, FRE due to a wrong variable assignation.
 # For now, we kept these as is, in order to keep the paper's experiments reproducible
+
+
+# 29/06/2022 : Main Task
+#v0) 
+# r = readability.Readability(text1) # gives a self.content for handling the text
+#       pppl = r.perplexity()
+#v1)
+# r = readability.Readability()
+#       # r = readability.Readability(text1) # gives a self.content for handling the text
+#       r.parse(text1) # => in charge of all common processes shared by various measures
+#       # => Returns object parsed_text_1
+#       #Warning : traditional features and Perplexity and BERT-like classification do not share common processes.
+#       pppl = r.perplexity()
+#       # nv text :
+#       r.parse(text2)
+#       pppl_2 = r.perplexity()
+#       # naive :
+#       r.parse(text1)
+#       gfi = r.gfi()
+# 
+#v2)
+# readability_processor = readability.Readability(exclude = [“pppl”])
+# pt1 = readability_processor.parse(text1) # ParsedText .r = R
+# pppl = pt1.perplexity() # Not Available value
+#     r.load(“pppl”) 
+#       pt1.set(r) # ? besoin de cette méthode set ?
+#     pppl = pt1.perplexity() # Available value
+#       pt2 = r.parse(text2)
+#       pppl_2 = pt2.perplexity()
+
+#What to do when user calls same method multiple times? if it's just a getter then no problem..
+#pt1.perplexity() 
+#pt1.perplexity() 
+#usage : pour 1 texte donné, appliquer toutes les mesures. Raisonnable.
+
+
+# modify r.compile() to become r.parse()
+# Usage of API should be : 
+# 1) init (load necessary models, prep processor)
+# 2) parse text 
+# 3) use any measure (keep external ressources loaded in r if needed)
+#
+# 
+#29/01
+#la méthode nlp doit être appelée qu’une seule fois quelque soit le nombre de features demandées
+#dupliquer Readability implique forcément dupliquer des ressources/traitement e.g. chargement des modèles 
+# -> distinguer la création de Readability (qui va charger le nécessaire commun au traitement de 1 ou plusieurs textes) du traitement des textes (parse)
+#usage : 
+#pour un texte, calculer plusieurs mesures -> factoriser ce qui est commun à plusieurs mesures ~ parse 
+#pour des textes différents, utiliser une même mesure -> éviter de répéter des traitements en double si indépendant 
+#par défaut la création de l’objet Readability charge tous les modèles mais on peut en exclure au chargement ou bien en charger ultérieurement,
+# s’inspirer de la méthode de chargement de spacy https://spacy.io/usage/processing-pipelines#disabling
+#méthode parse/process/measure : applique toutes les mesures non exclues ; retourne un objet parsed text avec des accesseurs 
+#permettant où toutes les mesures ont été appelés
+#actuellement gère notion de corpus découpé en classe et calcul moyenne des scores pour une classe donnée -> éventuellement une méthode intermédiaire 
+#non adhérente au format corpus (dict…) qui traite une mesure pour une liste de texte (sans notion de classe)  
+
+
+# Fonctionnement de la librarie détaillée :
+
+# D'abord d'initaliser un readability_processor en excluant certains modèles et en précisant la langue (bon seulement le français fonctionne pour l'instant).
+# => readability_processor = readability.Readability(lang = "fr", exclude = ["pppl","other_score","abc"]):
+# On suppose que l'on cherche ensuite chaque score indiquée dans un objet methods, qui associe chaque score à une fonction de calcul, et possiblement un modèle.
+# Si detection, on transpose ces associations dans un objet excluded_methods.
+# On regarde ensuite tout les modèles conservés dans l'objet methodes : d'aprés ce qui reste, le processeur charge les modèles et prépare le nécessaire.
+
+# L'utilisateur décide de traiter un texte :
+# => pt1 = readability_processor.parse(text1) #renvoie un objet parsedText, dont un attribut est une reference à readability_processor
+# Je suppose que deux objets peuvent partager la même instance mais on verra lors du développement.
+# Lors de l'execution de .parse(), pt1 génére une liste de mesures utiles pour différentes méthodes : reprise du code actuel r.compile()
+# L'utilisateur peut faire pt1.show_values() et ça renvoie un tableau contenant tout les scores calculables, ou déja calculés :
+# On regarde d'abord chaque score calculé dans une liste pt1.scores["score"]
+# Et on regarde ce qui est disponible dans methods dans pt1.r, on décide de calculer ou non et d'ajouter à la liste NA ou NaN si cela n'est pas le cas.
+# Pour le reste inclus dans excluded_methods, on ajoute à la liste en indiquant NA ou NaN.
+# L'utilisateur peut décider de recupérer un score en particulier en appelant la fonction :
+# => pppl = pt1.perplexity()
+# Dans ce cas, on fait une vérification (if pt1.score['pppl'] == None : do the function otherwise return the score).
+# De plus, on peut décider de faire r.load("pppl") pour rendre disponible la fonction (en chargeant éventuellement les ressources nécessaires)
+
 
 
 
@@ -85,13 +167,13 @@ class Readability:
         if lang == "fr" and nlp == "spacy_sm":
             try:
                 self.nlp = spacy.load('fr_core_news_sm')
-                print("DEBUG: Spacy model location (already installed) : ",self.nlp._path)
+                print("DEBUG: Spacy model location (already installed) : ", self.nlp._path)
             except OSError:
                 print('Downloading spacy language model \n(Should only happen once)')
                 from spacy.cli import download
                 download('fr_core_news_sm')
                 self.nlp = spacy.load('fr_core_news_sm')
-                print("DEBUG: Spacy model location : ",self.nlp._path)
+                print("DEBUG: Spacy model location : ", self.nlp._path)
         else:
             print("ERROR : Natural Language Processor not found for parameters :  lang=",lang," nlp=",nlp,sep="")
             self.nlp = None
@@ -118,7 +200,7 @@ class Readability:
             for sentence in self.content:
                 nb_words += len(sentence)
             if nb_words < 101:
-                print("WARNING : Text length is less than 100 words, some scores will be inaccurate.")
+                print("WARNING: Text length is less than 100 words, some scores will be inaccurate.")
         
 
         # This is a dictionary that maps values that can be obtained from the readability class with the functions used to calculate them.
@@ -424,11 +506,11 @@ class Readability:
         """Utility function that calls one of the function listed in self.score_types with default arguments"""
         if score_type in self.score_types["no_argument_needed"].keys():
             func = self.score_types["no_argument_needed"][score_type]
-            print("WARNING : Score type '",score_type,"' not found in current instance, now using function ",func.__name__, " with default parameters",sep="")
+            print("WARNING: Score type '",score_type,"' not found in current instance, now using function ",func.__name__, " with default parameters",sep="")
             return func()
         elif score_type in self.score_types["argument_needed"].keys():
             func =  self.score_types["argument_needed"][score_type]
-            print("WARNING : Score type '",score_type,"' not found in current instance, now using function ",func.__name__, " with default parameters",sep="")
+            print("WARNING: Score type '",score_type,"' not found in current instance, now using function ",func.__name__, " with default parameters",sep="")
             return func(score_type)
     
     def get_corpus_scores(self, score_type=None, scores=None):
@@ -523,15 +605,13 @@ class Readability:
         Stub for functions that do the same logic when calculating a score and then potentially assign it to .corpus_statistics or else
 
         func is just a reference to the function
-        func_args_text will be a tuple or list with the needed arguments for a text.
-        func_args_corpus will be the same, when we're dealing with a corpus
-        score_name is self_explanatory, instead of trying to deduce a score_name from the function or the parameters, just allow to pass it 
+        func_args is a tuple  with the needed arguments for a text.
+        score_name is the name of the score to assign to .corpus_statistics in order to re-use it in other methods.
         """
         if self.content_type == "text":
             print(func_args)
             print(*(func_args))
             return func(self.content, *(func_args))
-        #^ this should unpack tuple into several arguments... probably.
         elif self.content_type == "corpus":
             scores = {}
             for level in self.classes:
