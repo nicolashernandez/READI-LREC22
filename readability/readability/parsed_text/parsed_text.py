@@ -4,6 +4,7 @@ The ParsedText class serves as an interface between a text and a readability_pro
 It is meant to be created as a result of readability_processor.parse() since it uses the processor in order to know which measures are available, and
 have access to the resources necessary to calculate them.
 """
+from cmath import nan
 import copy
 import math
 
@@ -75,12 +76,27 @@ class ParsedText:
 
     def show_scores(self,force=False):
         # TODO : Create a dataframe, append each already-calculated score
+        df = []
+        if force:
+            for score_name in list(self.scores.keys()):
+                if self.scores[score_name] is None:
+                    # Check if score can be calculated, and if its dependencies are available.
+                    if self.readability_processor.check_score_and_dependencies_available(score_name):
+                        self.scores[score_name] = self.readability_processor.informations[score_name]["function"](self.content)
+        
+        df.append(self.scores)
+        df = pd.DataFrame(df)
+        return df
+        
+        # Otherwise for force=false append each remaining score but add NaN or NaN
+
         # Then if force=True => for every non-calculated score =>
         #   Check if score appears in .readability_processor.informations:
         #       Calculate that score and append to dataframe
         #       Else put NA or NaN
-        # Otherwise for force=false append each remaining score but add NaN or NaN
+        
         # Then sort dataframe by name?
+        #math_formulas = pd.DataFrame([moy_GFI,moy_ARI,moy_FRE,moy_FKGL,moy_SMOG,moy_REL],columns=levels)
         # No need to store the dataframe since checking if scores appear in dict should take a miniscule amount of time
         return -1
 

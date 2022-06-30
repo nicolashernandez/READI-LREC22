@@ -119,16 +119,16 @@ class Readability:
             rel=dict(function=self.rel,dependencies=[]),
             pppl=dict(function=self.perplexity,dependencies=["GPT2_LM"]),
             dubois_buyse_ratio=dict(function=self.dubois_proportion,dependencies=["dubois_dataframe"]),
-            ttr=dict(function=self.diversity,dependencies=[]),
-            ntr=dict(function=self.diversity,dependencies=[]),
-            old20=dict(function=self.average_levenshtein_distance,dependencies=["lexique_dataframe"]),
-            pld20=dict(function=self.average_levenshtein_distance,dependencies=["lexique_dataframe"]),
-            #following are stubs since it isn't 100% implemented
-            bert_value=dict(function=self.stub_BERT,dependencies=["BERT"]),
-            fasttext_value=dict(function=self.stub_fastText,dependencies=["fastText"]),
-            rsrs=dict(function=self.stub_rsrs,dependencies=["GPT2_LM"]),
+            ttr=dict(function=self.ttr,dependencies=[]),
+            ntr=dict(function=self.ntr,dependencies=[]),
+            old20=dict(function=self.old20,dependencies=["lexique_dataframe"]),
+            pld20=dict(function=self.pld20,dependencies=["lexique_dataframe"]),
             cosine_similarity_tfidf=dict(function=self.lexical_cohesion_tfidf,dependencies=[]),
             cosine_similarity_LDA=dict(function=self.lexical_cohesion_LDA,dependencies=["fauconnier_model"])
+            #following aren't 100% implemented yet
+            #bert_value=dict(function=self.stub_BERT,dependencies=["BERT"]),
+            #fasttext_value=dict(function=self.stub_fastText,dependencies=["fastText"]),
+            #rsrs=dict(function=self.stub_rsrs,dependencies=["GPT2_LM"]),
         )
         self.excluded_informations = dict()
 
@@ -280,7 +280,7 @@ class Readability:
         """
         if not self.check_score_and_dependencies_available("pppl"):
             raise RuntimeError("measure 'pppl' cannot be calculated.")
-        print("Please be patient, pseudo-perplexity takes a lot of time to calculate.")
+        #print("Please be patient, pseudo-perplexity takes a lot of time to calculate.")
         return perplexity.PPPL_score(self.dependencies["GPT2_LM"],content)
     
     def stub_rsrs():
@@ -350,6 +350,12 @@ class Readability:
         if not self.check_score_and_dependencies_available(mode):
             raise RuntimeError("measure", mode, "cannot be calculated.")
         return func(self.dependencies["lexique_dataframe"]["dataframe"],content,self.nlp,mode)
+
+    def old20(self, content):
+        return self.average_levenshtein_distance(content, "old20")
+
+    def pld20(self, content):
+        return self.average_levenshtein_distance(content, "pld20")
 
     # NOTE : These 3 could be grouped together in the same function, and just set an argument type="X"
     def count_pronouns(self, content, mode="text"):

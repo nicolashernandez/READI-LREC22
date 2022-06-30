@@ -152,7 +152,6 @@ def average_cosine_similarity_LDA(model, text, nlp = None, mode="text"):
     for sentence_tokens in sentences:
         doc = ' '.join(sentence_tokens)
         prepped_text.append(spacy_filter(doc,nlp))
-    print(prepped_text)
 
     # Convert sentences into BOW vectors
     dictionary = corpora.Dictionary(prepped_text)
