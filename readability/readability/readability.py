@@ -30,7 +30,7 @@ from .parsed_text import parsed_text
 # For now :
 #     Fix notebook.. again. I used things like os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
 #     to reference the data folder that is a parent of the lib, but some user environments
-#     refer to the lib via a '/usr/local/lib/python3.7/....' path (or something similar since it is instlled..).
+#     refer to the lib via a '/usr/local/lib/python3.7/....' path (or something similar since it is installed..).
 #     So it fails since the data folder isn't included in the library.
 #     Either duplicate data inside the lib or apply a band-aid fix to the notebook (Not a good idea)
 
@@ -94,7 +94,7 @@ from .parsed_text import parsed_text
 # 3) use any measure (keep external ressources loaded in r if needed)
 #
 # 
-#29/01
+#29/06
 #la méthode nlp doit être appelée qu’une seule fois quelque soit le nombre de features demandées
 #dupliquer Readability implique forcément dupliquer des ressources/traitement e.g. chargement des modèles 
 # -> distinguer la création de Readability (qui va charger le nécessaire commun au traitement de 1 ou plusieurs textes) du traitement des textes (parse)
@@ -135,7 +135,13 @@ from .parsed_text import parsed_text
 # De plus, on peut décider de faire r.load("pppl") pour rendre disponible la fonction (en chargeant éventuellement les ressources nécessaires)
 
 
-
+#Quick checklist :
+# Create new constructor for processor and parsedtext : V
+# make new methods : load,parse, show_scores, show_statistics, show_text (almost done, just need show_scores)
+# Convert each method in Readability to make them use the new information available in ... .informations : X
+# Aka make them use argument text instead of relying on self.content.
+# and in some cases, replace / delete some functions, like the ones that check if a model exists and import if so
+# just make them check in .dependencies, if it appears then it's been imported (at init or via self.load())
 
 # NOTE: There probably exists a better way to create an Statistics object as an attribute of Readability.
 class Statistics:
@@ -149,7 +155,7 @@ class Readability:
 
     In its current state, scores are meant to be used with the French language, but this can change in the future.
     """
-    def __init__(self, content, exclude = [""], lang = "fr", nlp = "spacy_sm", perplexity_processor = "gpt2",):
+    def __init__(self, exclude = [""], content="dummy", lang = "fr", nlp = "spacy_sm"):
         """
         Constructor of the Readability class, won't return any value but creates the attributes :
         self.content, self.content_type, self.nlp, self.lang, and self.classes only if input is a corpus.
@@ -162,8 +168,6 @@ class Readability:
         :param str perplexity_processor: Type of processor to use for the calculation of pseudo-perplexity
         """
         self.lang = lang
-        self.perplexity_processor = perplexity_processor
-        self.perplexity_calculator = perplexity.pppl_calculator
         
         # Handle the NLP processor (mainly for tokenization in case we're given a text as a string)
         # Note : I tried adding the spacy model as a dependency in setup.cfg:
@@ -191,15 +195,15 @@ class Readability:
         # Handling corpus that probably is a corpus
         # Reminder, structure needed is : dict => list of texts => list of sentences => list of words
         # TODO : check this with a bunch of edge cases
-        if type(content) == dict:
-            if isinstance(content[list(content.keys())[0]], list):
-                if isinstance(content[list(content.keys())[0]][0], list):
-                    if isinstance(content[list(content.keys())[0]][0][0], list):
-                        self.content_type = "corpus"
-                        self.content = content
-                        self.classes = list(content.keys())
-            #else, check if the structure is dict[class][text].. and tokenize everything (warn user it'll take some time)
-            #and then use that as the new structure
+        #if type(content) == dict:
+        #    if isinstance(content[list(content.keys())[0]], list):
+        #        if isinstance(content[list(content.keys())[0]][0], list):
+        #            if isinstance(content[list(content.keys())[0]][0][0], list):
+        #                self.content_type = "corpus"
+        #                self.content = content
+        #                self.classes = list(content.keys())
+        #    #else, check if the structure is dict[class][text].. and tokenize everything (warn user it'll take some time)
+        #    #and then use that as the new structure
         
         if self.content_type == "text":
             nb_words = 0
@@ -207,30 +211,8 @@ class Readability:
                 nb_words += len(sentence)
             if nb_words < 101:
                 print("WARNING: Text length is less than 100 words, some scores will be inaccurate.")
-        
 
-        # This is a dictionary that maps values that can be obtained from the readability class with the functions used to calculate them.
-        # This is used for generalizable methods such as remove_outliers can be used no matter what kind of score.
-        # It differenciates between scores that are obtained directly from a function, or functions that need a parameter to indicate the type of score to return.
-        self.score_types = dict(
-            no_argument_needed = dict(
-                gfi=self.gfi,
-                ari=self.ari,
-                fre=self.fre,
-                fkgl=self.fkgl,
-                smog=self.smog,
-                rel=self.rel,
-                perplexity=self.perplexity,
-                dubois_buyse_ratio=self.dubois_proportion),
-            argument_needed = dict(
-                ttr=self.diversity,
-                ntr=self.diversity,
-                old20=self.average_levenshtein_distance,
-                pld20=self.average_levenshtein_distance)
-            )
-
-        # TODO: Factorising the library, first we define every possible (score,function,dependency) combination
-        # Keys are names of values that can be calculated by the library.
+        # This dictionary associates values with the functions used to calculate them, alongside the dependencies needed.
         self.informations = dict(
             gfi=dict(function=self.gfi,dependencies=[]),
             ari=dict(function=self.ari,dependencies=[]),
@@ -271,12 +253,14 @@ class Readability:
     def load(self,value):
         """
         TODO: doc
+        also give success message telling user what happened instead of return 0
         """
         # Based on the value's name, check if exists in self.excluded_informations, return error or warning if so:
         if value in list(self.excluded_informations.keys()):
             # Transpose back to self.informations
             self.informations[value] = self.excluded_informations[value]
             del self.excluded_informations[value]
+            print("Value '",value,"' can now be calculated",sep="")
             # Check if there's a dependency, and handle it if wasn't imported already
             for dependency in self.informations[value]["dependencies"]:
                 if dependency not in list(self.dependencies.keys()):
@@ -289,13 +273,11 @@ class Readability:
         else:
             # Raise error to tell user this measure isn't recognized
             raise ValueError("Value",value,"was not recognized as par of instance.informations or instance.excluded_informations, Please check if you've done a typo.")
-        return 0
     
     def parse(self,text):
         """
         TODO: doc
         """
-        #WELP TIME TO SEE WHAT HAPPENS
         return parsed_text.ParsedText(text,self)
 
     def score(self, name):
@@ -397,9 +379,7 @@ class Readability:
                 values[score] = self.score(score)
             return values
 
-
-    #TODO : redo this to be in line with other functions
-    def perplexity(self):
+    def perplexity(self,content):
         """
         Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
         Please refer to this paper for more details : https://doi.org/10.18653%252Fv1%252F2020.acl-main.240
@@ -407,21 +387,28 @@ class Readability:
         :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
         :rtype: :rtype: Union[float,dict[str][list(float)]] 
         """
-        if not hasattr(self.perplexity_calculator, "model_loaded"):
-            print("Loading model for pseudo-perplexity..")
-            self.perplexity_calculator.load_model()
-            print("Model is now loaded")
+        if not self.check_score_and_dependencies_available("pppl"):
+            raise RuntimeError("measure 'pppl' cannot be calculated.")
         print("Please be patient, pseudo-perplexity takes a lot of time to calculate.")
-        if self.content_type == "text":
-            return self.perplexity_calculator.PPPL_score_text(self.content)
-        elif self.content_type == "corpus":
-            scores = self.perplexity_calculator.PPPL_score(self.content)
-            if hasattr(self, "corpus_statistics"):
-                for level in self.classes:
-                    for index,score in enumerate(scores[level]):
-                        setattr(self.corpus_statistics[level][index],"perplexity",score)
-            return scores
-        return -1
+        return perplexity.PPPL_score(self.dependencies["GPT2_LM"],content)
+    
+    def check_score_and_dependencies_available(self,score_name):
+        """
+        TODO doc
+        """
+        if score_name not in list(self.informations.keys()):
+            print("Value", score_name, "was not found in instance.informations. Please check if you excluded it when initializing the ReadabilityProcessor.")            
+            return False
+        else:
+            if score_name in list(self.informations.keys()):
+                dependencies = self.informations[score_name]["dependencies"]
+            else:
+                dependencies = self.excluded_informations[score_name]["dependencies"]
+            for dependency_name in dependencies:
+                if dependency_name not in list(self.dependencies.keys()):
+                    print("Dependency", dependency_name, "was not found in instance.dependencies. Something's gone wrong")
+                    return False
+        return True
 
 
     def diversity(self, type, mode=None):

@@ -86,9 +86,13 @@ class ParsedText:
         return -1
 
     def show_statistics(self):
-        # TODO: for each stat in .statistics, append that to a dataframe and print it.
-        return -1
-
+        """
+        Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.
+        In this case, this will output the mean values of each score for each class.
+        """
+        for stat in list(self.statistics.keys()):
+            print(stat, "=", self.statistics[stat])
+        return self.statistics
 
     # NOTE : Explicitely naming each of the functions but probably exists a better way to set certain function names from the ReadabilityProcessor instance
     # Directly calling them from self.readability_processor.information[value][function] could be possible
@@ -99,12 +103,11 @@ class ParsedText:
 
     def perplexity(self):
         if self.scores["pppl"] == None:
-            self.scores["pppl"] = self.readability_processor.perplexity()
+            self.scores["pppl"] = self.readability_processor.perplexity(self.content)
         return self.scores["pppl"]
 
     def diversity(self, type, mode=None):
         if self.scores["pppl"] == None:
-            self.scores["pppl"] = self.readability_processor.diversity(type, mode)
+            self.scores["pppl"] = self.readability_processor.diversity(self.content,type, mode)
         return self.scores["pppl"]
-
-    # I probably could make a call_function(func_args) subroutine, but what happens if func_args is empty, does it add nothing or does it break.
+    
