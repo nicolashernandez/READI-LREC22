@@ -99,7 +99,22 @@ class ParsedText:
     # put them here just in case.
     # I suppose I could make a call_function(func_args) subroutine, but I wonder what happens if func_args is empty
     # Does doing *(func_args) result in nothing, or is an empty argument added?
+    def stub_call_score(self,score_name):
+        # check if score_name already in scores:
+        if self.scores[score_name] is not None:
+            return self.scores[score_name]
+        # otherwise check if score_name is available in processor:
+        elif self.readability_processor.check_score_and_dependencies_available(score_name):
+            # If so, then call function : func = readability_processor.informations[score_name][function]
+            func = self.readability_processor.informations[score_name]["function"]
+            # func_default_args = something #probably can add them to readability_processor.informations[score_name]["default_arguments"].
+            func_default_args = "unknown"
+            # return func(self.content, func_default_args)
+            print("function detected: ",func)
+        return 0
+    
 
+    # Traditional measures
     def traditional_score(self,score_name):
         if self.scores[score_name] == None:
             self.scores[score_name] = self.readability_processor.score(score_name,self.content,self.statistics)
@@ -130,22 +145,76 @@ class ParsedText:
         return self.traditional_score("rel")
 
 
+    # Measures related to perplexity
     def perplexity(self):
         if self.scores["pppl"] == None:
             self.scores["pppl"] = self.readability_processor.perplexity(self.content)
         return self.scores["pppl"]
+    
+    def stub_rsrs(self):
+        if self.scores["rsrs"] == None:
+            self.scores["rsrs"] = self.readability_processor.stub_rsrs(self.content)
+        return self.scores["rsrs"]
 
 
-    def diversity(self, ratio_type, formula_type=None):
-        if self.scores[ratio_type] == None:
-            self.scores[ratio_type] = self.readability_processor.diversity(self.content, ratio_type, formula_type)
+    # Measures related to text diversity
+    def diversity(self, ratio_type, formula_type=None, force=False):
+        if self.scores[ratio_type] == None or force:
+            self.scores[ratio_type] = self.readability_processor.diversity(self.content,ratio_type,formula_type)
         return self.scores[ratio_type]
 
-    def ttr(self, formula_type=None):
+    def ttr(self, formula_type=None, force=False):
         """Returns Text Token Ratio: number of unique words / number of words"""
-        return self.diversity("ttr", formula_type)
+        return self.diversity("ttr", formula_type, force)
 
-    def ntr(self, formula_type=None):
+    def ntr(self, formula_type=None, force=False):
         """Returns Noun Token Ratio: number of nouns / number of nouns"""
-        return self.diversity("ntr", formula_type)
+        return self.diversity("ntr", formula_type, force)
     
+
+    # Measures based on pre-existing word lists
+    def dubois_proportion(self,filter_type="total",filter_value=None, force=False):
+        if self.scores["dubois_buyse_ratio"] == None or force:
+            self.scores["dubois_buyse_ratio"] = self.readability_processor.dubois_proportion(self.content,filter_type,filter_value)
+        return self.scores["dubois_buyse_ratio"]
+
+    def average_levenshtein_distance(self,mode="old20", force=False):
+        if self.scores[mode] == None or force:
+            self.scores[mode] = self.readability_processor.average_levenshtein_distance(self.content,mode)
+        return self.scores[mode]
+
+    # NOTE : might do these 3 at start-up instead.
+    def count_pronouns(self,mode="text"):
+        if "nb_pronouns" in list(self.statistics.keys()):
+            if self.statistics["nb_pronouns"] == None:
+                self.statistics["nb_pronouns"] = self.readability_processor.count_pronouns(self.content,mode)
+        else: 
+            self.statistics["nb_pronouns"] = self.readability_processor.count_pronouns(self.content,mode)
+        return self.statistics["nb_pronouns"]
+    
+    def count_articles(self,mode="text"):
+        if "nb_articles" in list(self.statistics.keys()):
+            if self.statistics["nb_articles"] == None:
+                self.statistics["nb_articles"] = self.readability_processor.count_articles(self.content,mode)
+        else: 
+            self.statistics["nb_articles"] = self.readability_processor.count_articles(self.content,mode)
+        return self.statistics["nb_articles"]
+        
+    def count_proper_nouns(self,mode="text"):
+        if "nb_proper_nouns" in list(self.statistics.keys()):
+            if self.statistics["nb_proper_nouns"] == None:
+                self.statistics["nb_proper_nouns"] = self.readability_processor.count_proper_nouns(self.content,mode)
+        else: 
+            self.statistics["nb_proper_nouns"] = self.readability_processor.count_proper_nouns(self.content,mode)
+        return self.statistics["nb_proper_nouns"]
+
+    def lexical_cohesion_tfidf(self,mode="text"):
+        if self.scores["cosine_similarity_tfidf"] == None:
+            self.scores["cosine_similarity_tfidf"] = self.readability_processor.lexical_cohesion_tfidf(self.content,mode)
+        return self.scores["cosine_similarity_tfidf"]
+
+    # NOTE: this seems to output the same values, whether we use text or lemmas, probably due to the type of model used.
+    def lexical_cohesion_LDA(self,mode="text"):
+        if self.scores["cosine_similarity_LDA"] == None:
+            self.scores["cosine_similarity_LDA"] = self.readability_processor.lexical_cohesion_LDA(self.content,mode)
+        return self.scores["cosine_similarity_LDA"]

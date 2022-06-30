@@ -19,31 +19,10 @@ from collections import Counter
 # = Average distance of 20 closest words found in lexicon, or closest phonemes.
 # Can be found on the 125,623 entries of the Lexique 3.6 database.
 
-DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
+DATA_ENTRY_POINT = utils.DATA_ENTRY_POINT
 
-lexique_df = None
-def import_lexique_dataframe():
-    """Imports contents of a slimmed version of the Lexique 3.0 database, Available here : http://www.lexique.org/"""
-    global lexique_df
-    if not isinstance(lexique_df,pd.DataFrame):
-        #print("lexique dataframe imported")
-        #DATA_PATH = os.path.join(DATA_ENTRY_POINT,'lexique','Lexique383.tsv')
-        DATA_PATH = os.path.join(DATA_ENTRY_POINT,'lexique','Lexique383_slim.tsv')
-        df=pd.read_csv(DATA_PATH, sep = '\t')
-        lexique_df = df
-        return df
-    else:
-        #print("lexique dataframe already imported")
-        return lexique_df
-
-def slim_lexique():
+def slim_lexique(df):
     """Reduces the size of the Lexique 3.0 database in order to keep only important columns"""
-    df = import_lexique_dataframe()
-    
-    # Converting each recognized noun in text to its lemma in lowercase, in order to check if there's a match
-    # First ignore everything that isn't a lemma to reduce the dataset size : We are now getting 47k words out of 142k
-    #df = df.loc[df['islem'] == 1]
-
     # Remove duplicate values : down to 45k words
     #df = df.drop_duplicates(subset="lemme")
     df = df.drop_duplicates(subset="ortho")
@@ -55,7 +34,7 @@ def slim_lexique():
     print("saved slimmer lexique in data/lexique/")
     return 0
 
-def average_levenshtein_distance(text, nlp=None, mode = "old20"):
+def average_levenshtein_distance(df, text, nlp=None, mode = "old20"):
     """
     Returns the average Orthographic Levenshtein Distance 20 (old20), or its phonemic equivalent (pld20).
     Currently using the Lexique 3.0 database for French texts, version 3.83. More details here : http://www.lexique.org/
@@ -70,8 +49,6 @@ def average_levenshtein_distance(text, nlp=None, mode = "old20"):
     :return: Average of old20 or pld20 for each word in current text
     :rtype: float
     """
-
-    df = import_lexique_dataframe()
     # Converting each recognized noun in text to lowercase, in order to check if there's a match.
     # Not using lemmas since we don't want to modify a word's suffixes or prefixes.
     # NOTE : We probably don't need spacy here, if further optimization is needed
@@ -132,28 +109,13 @@ def average_levenshtein_distance(text, nlp=None, mode = "old20"):
 # Commentaire and Variantes are not useful, they indicate whether a word is composite, and the lemmatized form but this applies for only a few words out of several thousands
 # age and A.scolaire indicate the age, and corresponding grade where a word is ranked. 
 # cycle indicates the placement of a word within the five three-year cycles, although the fifth one only contains the first year.
-
-dubois_df = None
-
-def import_dubois_dataframe():
-    global dubois_df
-    if not isinstance(dubois_df,pd.DataFrame):
-        #print("dubois dataframe imported")
-        DATA_PATH = os.path.join(DATA_ENTRY_POINT,'word_list','Dubois_Buysse.xlsx')
-        df=pd.read_excel(DATA_PATH)
-        dubois_df = df
-        return df
-    else:
-        #print("dubois dataframe already imported")
-        return dubois_df
-
 def generate_dubois_word_list(df):
     word_list = {}
     for cycle in df["A.Scolaire"].unique():
         word_list[cycle] = [x for x, y in zip(df['Mot'], df['A.Scolaire']) if y == cycle]
     return word_list
 
-def dubois_proportion(text, nlp = None, typ = "total", filter = None):
+def dubois_proportion(df, text, nlp = None, typ = "total", filter = None):
     """
     Returns the proportion of nouns included in the Dubois-Buyse word list for a specific text
     This function can specify the ratio for specific echelons, ages|school grades, or three-year cycles
@@ -161,7 +123,6 @@ def dubois_proportion(text, nlp = None, typ = "total", filter = None):
     # NOTE : possible improvement, add a plot bool parameter in order to show distribution of ratios for a certain type over all possible values.
     # For example : for each text in a corpus, when gradually adding words that are learned at later ages,
     # is the rate of words recognized in the list linear, quadratic, or something else? Could be useful.
-    df = import_dubois_dataframe()
     text = utils.convert_text_to_string(text)
 
     # Converting each recognized noun in text to its lemma in lowercase, in order to check if there's a match
@@ -214,8 +175,8 @@ def dubois_proportion(text, nlp = None, typ = "total", filter = None):
         total_nouns_in_list += noun_counter[element] if element in df['Mot'].values else 0
         number_nouns_in_list += 1 if element in df['Mot'].values else 0
 
-    #print("number of different nouns altogether = ", number_nouns)
-    #print("total of nouns (according to spacy) = ", total_nouns)
+    #print("number of different nouns in = ", number_nouns)
+    #print("total of nouns in text(according to spacy) = ", total_nouns)
     #print("number of different nouns in word list = ", number_nouns_in_list)
     #print("total of nouns in word list = ", total_nouns_in_list)
     return(total_nouns_in_list / total_nouns)

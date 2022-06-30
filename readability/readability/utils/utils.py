@@ -5,8 +5,10 @@ or things that are useful in order to reproduce the contents of the READI paper.
 import pickle
 import os
 import pandas as pd
+import requests
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import torch
+from gensim.models import KeyedVectors
 from unidecode import unidecode
 
 
@@ -155,12 +157,14 @@ def load_dependency(dependency_name):
                     tokenizer=tokenizer,
                     max_length=100,
                     model_loaded = True)
+
     elif dependency_name == "dubois_dataframe":
         print("importing dubois-buyse data as dataframe")
         DATA_PATH = os.path.join(DATA_ENTRY_POINT,'word_list','Dubois_Buysse.xlsx')
         df=pd.read_excel(DATA_PATH)
         print("dubois-buyse dataframe imported")
         return dict(dataframe=df)
+
     elif dependency_name == "lexique_dataframe":
         print("importing lexique data as dataframe")
         DATA_PATH = os.path.join(DATA_ENTRY_POINT,'lexique','Lexique383_slim.tsv')
@@ -168,11 +172,28 @@ def load_dependency(dependency_name):
         print("lexique dataframe imported")
         return dict(dataframe=df)
 
+    elif dependency_name == "fauconnier_model":
+        try:
+            with open(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), "rb") as f:
+                model = KeyedVectors.load_word2vec_format(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), binary=True, unicode_errors="ignore")
+                print("imported french word2vec model")
+                return model
+        except IOError:
+            url = "https://embeddings.net/embeddings/frWac_no_postag_no_phrase_500_cbow_cut100.bin"
+            print("WARNING : Acquiring french word2vec model remotely since model was not found locally.")
+            response = requests.get(url)
+            with open(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), "wb") as f:
+                f.write(response.content)
+            model = KeyedVectors.load_word2vec_format(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), binary=True, unicode_errors="ignore")
+            return model
+
     #These depend on actual data to be initialized, so i'll do it when I clean up BERT/fastText.
     elif dependency_name == "BERT":
         return dict(dummy_var="dummy_value")
+
     elif dependency_name =="fastText":
         return dict(dummy_var="dummy_value")
+
     else:
         raise ValueError("Dependency '",dependency_name,"' was not recognized as a valid dependency.")
 

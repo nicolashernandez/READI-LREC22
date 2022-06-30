@@ -52,101 +52,6 @@ from .parsed_text import parsed_text
 # These being GFI, ARI due to wrong formulas, SMOG due to an error in calculating polysyllables, FRE due to a wrong variable assignation.
 # For now, we kept these as is, in order to keep the paper's experiments reproducible
 
-
-# 29/06/2022 : Main Task
-#v0) 
-# r = readability.Readability(text1) # gives a self.content for handling the text
-#       pppl = r.perplexity()
-#v1)
-# r = readability.Readability()
-#       # r = readability.Readability(text1) # gives a self.content for handling the text
-#       r.parse(text1) # => in charge of all common processes shared by various measures
-#       # => Returns object parsed_text_1
-#       #Warning : traditional features and Perplexity and BERT-like classification do not share common processes.
-#       pppl = r.perplexity()
-#       # nv text :
-#       r.parse(text2)
-#       pppl_2 = r.perplexity()
-#       # naive :
-#       r.parse(text1)
-#       gfi = r.gfi()
-# 
-#v2)
-# readability_processor = readability.Readability(exclude = [“pppl”])
-# pt1 = readability_processor.parse(text1) # ParsedText .r = R
-# pppl = pt1.perplexity() # Not Available value
-#     r.load(“pppl”) 
-#       pt1.set(r) # ? besoin de cette méthode set ?
-#     pppl = pt1.perplexity() # Available value
-#       pt2 = r.parse(text2)
-#       pppl_2 = pt2.perplexity()
-
-#What to do when user calls same method multiple times? if it's just a getter then no problem..
-#pt1.perplexity() 
-#pt1.perplexity() 
-#usage : pour 1 texte donné, appliquer toutes les mesures. Raisonnable.
-
-
-# modify r.compile() to become r.parse()
-# Usage of API should be : 
-# 1) init (load necessary models, prep processor)
-# 2) parse text 
-# 3) use any measure (keep external ressources loaded in r if needed)
-#
-# 
-#29/06
-#la méthode nlp doit être appelée qu’une seule fois quelque soit le nombre de features demandées
-#dupliquer Readability implique forcément dupliquer des ressources/traitement e.g. chargement des modèles 
-# -> distinguer la création de Readability (qui va charger le nécessaire commun au traitement de 1 ou plusieurs textes) du traitement des textes (parse)
-#usage : 
-#pour un texte, calculer plusieurs mesures -> factoriser ce qui est commun à plusieurs mesures ~ parse 
-#pour des textes différents, utiliser une même mesure -> éviter de répéter des traitements en double si indépendant 
-#par défaut la création de l’objet Readability charge tous les modèles mais on peut en exclure au chargement ou bien en charger ultérieurement,
-# s’inspirer de la méthode de chargement de spacy https://spacy.io/usage/processing-pipelines#disabling
-#méthode parse/process/measure : applique toutes les mesures non exclues ; retourne un objet parsed text avec des accesseurs 
-#permettant où toutes les mesures ont été appelés
-#actuellement gère notion de corpus découpé en classe et calcul moyenne des scores pour une classe donnée -> éventuellement une méthode intermédiaire 
-#non adhérente au format corpus (dict…) qui traite une mesure pour une liste de texte (sans notion de classe)  
-
-
-# Suggestion de factorisation de la librarie à implémenter :
-
-# D'abord, initaliser un readability_processor en excluant certain scores.
-# => readability_processor = readability.Readability(lang = "fr", exclude = ["pppl","other_score","abc"]):
-# On suppose que l'on cherche ensuite chaque score indiqué dans un objet informations, qui associe chaque score à une fonction , et potentiellement une ressource externe, tel un modèle de langue
-# Si detection, on transpose ces informations dans un objet excluded_informations (et on enlève dans informations)
-# On regarde ensuite tout les scores conservés dans l'objet informations : d'aprés ce qui reste, le processeur charge les ressources et prépare le nécessaire.
-# ^ Je compte implémenter cela avec un dictionnaire de type : {scoreX : {nom_fonction : X, dependences:[a,b,c]}}
-
-# Ensuite, l'utilisateur décide de traiter un texte :
-# => pt1 = readability_processor.parse(text1) #renvoie un objet parsedText, dont l'attribut readability_processor est une reference une instance partagée.
-# Je suppose que deux objets peuvent "partager" la même instance mais on verra lors du développement.
-# Lors de l'execution de .parse(), pt1 génére une liste de mesures utiles pour différentes méthodes : reprise du code actuel r.compile()
-
-# L'utilisateur peut faire pt1.show_values(force_calculation=False) et cela renvoie un tableau contenant tout les scores calculables, ou déja calculés :
-# On regarde d'abord chaque score calculé ou non dans un dictionnaire pt1.scores
-# Si rencontre d'un score non calculé, et qu'on active force_calculation au préalable:
-#   On cherche ce score apparaît dans pt1.readability_processor.informations, on appelle la fonction correspondant, on calcule ce score et on l'ajoute au tableau.
-# Sinon, ou pour le reste des scores qui n'appairaissent pas dans readability_processor.informations (car exclus), on ajoute à la liste en indiquant NA ou NaN.
-
-# L'utilisateur peut décider de recupérer un score en particulier en appelant la fonction :
-# => pppl = pt1.perplexity()
-# Dans ce cas, on fait une vérification (if pt1.score['pppl'] == None : do the function otherwise return the score).
-# De plus, on peut décider de faire r.load("pppl") pour rendre disponible la fonction (en chargeant éventuellement les ressources nécessaires)
-
-
-#Quick checklist :
-# Create new constructor for processor and parsedtext : V
-# make new methods : load,parse, show_scores, show_statistics, show_text (almost done, just need show_scores)
-# Convert each method in Readability to make them use the new information available in ... .informations : X
-# Aka make them use argument text instead of relying on self.content.
-# and in some cases, replace / delete some functions, like the ones that check if a model exists and import if so
-# just make them check in .dependencies, if it appears then it's been imported (at init or via self.load())
-
-# NOTE: There probably exists a better way to create an Statistics object as an attribute of Readability.
-class Statistics:
-    pass
-
 class Readability:
     """
     The Readability class provides a way to access the underlying library modules in order to help estimate the complexity of any given text
@@ -221,7 +126,9 @@ class Readability:
             #following are stubs since it isn't 100% implemented
             bert_value=dict(function=self.stub_BERT,dependencies=["BERT"]),
             fasttext_value=dict(function=self.stub_fastText,dependencies=["fastText"]),
-            rsrs=dict(function=self.stub_rsrs,dependencies=["GPT2_LM"])
+            rsrs=dict(function=self.stub_rsrs,dependencies=["GPT2_LM"]),
+            cosine_similarity_tfidf=dict(function=self.lexical_cohesion_tfidf,dependencies=[]),
+            cosine_similarity_LDA=dict(function=self.lexical_cohesion_LDA,dependencies=["fauconnier_model"])
         )
         self.excluded_informations = dict()
 
@@ -250,11 +157,7 @@ class Readability:
 
     #NOTE : maybe also provide load_dependency(self,value)
     def load(self,value):
-        """
-        Checks if a measure or value has been excluded, enables it and loads its dependencies if needed.
-
-        :param str value: A valid measure or value that appears in self.informations at start-up.
-        """
+        """Checks if a measure or value has been excluded, enables it and loads its dependencies if needed."""
         # Based on the value's name, check if exists in self.excluded_informations
         if value in list(self.excluded_informations.keys()):
             # Transpose back to self.informations
@@ -275,9 +178,7 @@ class Readability:
             raise ValueError("Value",value,"was not recognized as par of instance.informations or instance.excluded_informations, Please check if you've done a typo.")
     
     def check_score_and_dependencies_available(self,score_name):
-        """
-        TODO doc
-        """
+        """Indicates whether a measure or value has been excluded, and if its dependencies are available."""
         if score_name not in list(self.informations.keys()):
             print("Value", score_name, "was not found in instance.informations. Please check if you excluded it when initializing the ReadabilityProcessor.")            
             return False
@@ -368,7 +269,7 @@ class Readability:
             return values
 
 
-    # Measures related to perplexity:
+    # Measures related to perplexity
     def perplexity(self,content):
         """
         Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
@@ -388,7 +289,7 @@ class Readability:
         return -1
     
 
-    # Measures related to text diversity:
+    # Measures related to text diversity
     def diversity(self, content, ratio_type, formula_type=None):
         """
         Outputs a measure of text diversity based on which feature to use, and which version of the formula is used.
@@ -418,7 +319,8 @@ class Readability:
         """Returns Noun Token Ratio: number of unique nouns / number of nouns"""
         return self.diversity(content, "ntr",formula_type)
 
-    def dubois_proportion(self, filter_type = "total", filter_value = None):
+    # Measures based on pre-existing word lists
+    def dubois_proportion(self, content, filter_type = "total", filter_value = None):
         """
         Outputs the proportion of words included in the Dubois-Buyse word list.
         Can specify the ratio for words appearing in specific echelons, ages|school grades, or three-year cycles.
@@ -430,30 +332,11 @@ class Readability:
         :rtype: Union[float,dict[str][list(float)]]
         """
         func = word_list_based.dubois_proportion
-        if self.content_type == "text":
-            return func(self.content,self.nlp,filter_type,filter_value)
-        elif self.content_type == "corpus":
-            scores = {}
-            for level in self.classes:
-                temp_score = 0
-                scores[level] = []
-                for index,text in enumerate(self.content[level]):
-                    scores[level].append(func(text,self.nlp,filter_type,filter_value))
-                    temp_score += scores[level][index]
-                    if hasattr(self, "corpus_statistics"):
-                        self.corpus_statistics[level][index].dubois_buyse_ratio = scores[level][index]
-                temp_score = temp_score / len(scores[level])
-                print("class", level, "mean score :" ,temp_score)
-            return scores
-        else:
-            return -1
+        if not self.check_score_and_dependencies_available("dubois_buyse_ratio"):
+            raise RuntimeError("measure 'dubois_buyse_ratio' cannot be calculated.")
+        return func(self.dependencies["dubois_dataframe"]["dataframe"], content, self.nlp, filter_type, filter_value)
 
-
-    #TODO : generalize the repeated code below, this must appear at least 10 times in total and the only
-    # thing that changes is when we call the inner function and setattr (which can probably be generalized instead of hard-coding)
-    # Or just give what name to put in corpus-statistics as an argument. ezpz.
-    # Sure it's hard coding but eh. EXTREMELY less bloat.
-    def average_levenshtein_distance(self,mode = "old20"):
+    def average_levenshtein_distance(self, content, mode = "old20"):
         """
         Returns the average Orthographic Levenshtein Distance 20 (OLD20), or its phonemic equivalent (PLD20).
         Currently using the Lexique 3.0 database for French texts, version 3.83. More details here : http://www.lexique.org/
@@ -463,60 +346,39 @@ class Readability:
         :return: Average of OLD20 or PLD20 for each word in current text
         :rtype: Union[float,dict[str][list(float)]]
         """
-        # Times for corpus tokens_split : [103.75190171699978, 476.5114750009998, 900.8312998260008, 1240.3407240750003]
-        # TODO : Optimize this, probably by only calling import_lexique_dataframe() once.
-        # Might need to make a function called average_levenshtein_distance_corpus() if it's worth the time gain
         func = word_list_based.average_levenshtein_distance
-        if self.content_type == "text":
-            return func(self.content,self.nlp,mode)
-        elif self.content_type == "corpus":
-            scores = {}
-            for level in self.classes:
-                temp_score = 0
-                scores[level] = []
-                for index,text in enumerate(self.content[level]):
-                    scores[level].append(func(text, self.nlp, mode))
-                    temp_score += scores[level][index]
-                    if hasattr(self, "corpus_statistics"):
-                        setattr(self.corpus_statistics[level][index],locals()['mode'],scores[level][index])
-                temp_score = temp_score / len(scores[level])
-                print("class", level, "mean score :" ,temp_score)
-            return scores
-        else:
-            return -1
+        if not self.check_score_and_dependencies_available(mode):
+            raise RuntimeError("measure", mode, "cannot be calculated.")
+        return func(self.dependencies["lexique_dataframe"]["dataframe"],content,self.nlp,mode)
 
-    # NOTE : These could be grouped together in the same function, and just set an argument type="X"
-    def count_pronouns(self, mode="text"):
+    # NOTE : These 3 could be grouped together in the same function, and just set an argument type="X"
+    def count_pronouns(self, content, mode="text"):
         func = discourse.nb_pronouns
-        return func(self.content,self.nlp,mode)
+        return func(content,self.nlp,mode)
     
-    def count_articles(self, mode="text"):
+    def count_articles(self, content, mode="text"):
         func = discourse.nb_articles
-        return func(self.content,self.nlp,mode)
+        return func(content,self.nlp,mode)
         
-    def count_proper_nouns(self, mode="text"):
+    def count_proper_nouns(self, content, mode="text"):
         func = discourse.nb_proper_nouns
-        return func(self.content,self.nlp,mode)
+        return func(content,self.nlp,mode)
 
-    def lexical_cohesion_tfidf(self, mode="text"):
+    def lexical_cohesion_tfidf(self, content, mode="text"):
+        if not self.check_score_and_dependencies_available("cosine_similarity_tfidf"):
+            raise RuntimeError("measure 'cosine_similarity_tfidf' cannot be calculated.")
         func = discourse.average_cosine_similarity_tfidf
-        return func(self.content,self.nlp,mode)
+        return func(content,self.nlp,mode)
 
-    # NOTE: this seem to output the same values, whether we use text or lemmas, probably due to the type of model used.
-    def lexical_cohesion_LDA(self, mode="text"):
+    # NOTE: this seems to output the same values, whether we use text or lemmas, probably due to the type of model used.
+    def lexical_cohesion_LDA(self, content, mode="text"):
+        if not self.check_score_and_dependencies_available("cosine_similarity_LDA"):
+            raise RuntimeError("measure 'cosine_similarity_LDA' cannot be calculated.")
         func = discourse.average_cosine_similarity_LDA
-
-        # ok so for our thing there are two things we need to pass
-        # 1) the function alongside the needed arguments
-        # 2) what name to give it for .corpus_statistics purposes. aka re-use for faster execution | use it in .scores() function eventually
-        #return func(self.content,self.nlp,mode)
-
-        return self.stub_generalize_get_score(func, (self.nlp,mode), "score_lda")
+        return func(self.dependencies["fauconnier_model"],content,self.nlp,mode)
 
 
-    
-
-
+    # Measures obtained from Machine Learning models :
     def stub_SVM():
         #TODO: allow user to use default tf-idf matrix thing or with currently known features from other methods(common_scores text diversity, etc..)
         return -1
@@ -530,328 +392,9 @@ class Readability:
         return -1
 
 
+    # Measures obtained from Deep Learning models
     def stub_fastText():
         return -1
         
     def stub_BERT():
         return -1
-
-
-    # Utility functions that I don't think I can put in utils
-    def do_function_with_default_arguments(self,score_type):
-        """Utility function that calls one of the function listed in self.score_types with default arguments"""
-        if score_type in self.score_types["no_argument_needed"].keys():
-            func = self.score_types["no_argument_needed"][score_type]
-            print("WARNING: Score type '",score_type,"' not found in current instance, now using function ",func.__name__, " with default parameters",sep="")
-            return func()
-        elif score_type in self.score_types["argument_needed"].keys():
-            func =  self.score_types["argument_needed"][score_type]
-            print("WARNING: Score type '",score_type,"' not found in current instance, now using function ",func.__name__, " with default parameters",sep="")
-            return func(score_type)
-    
-    def get_corpus_scores(self, score_type=None, scores=None):
-        """
-        Utility function that searches relevant scores if a valid score_type that belongs to self.score_types is specified.
-        If no scores can be recovered, this function will attempt to call the corresponding function with default arguments.
-
-        :return: a dictionary, assigning a value to each text of each specified class of a corpus.
-        :rtype: dict[str][str][str][str]
-        """
-        # There are 5 cases:
-        # score_type is unknown : error
-        # score_type is known,scores are known : do the actual function
-        # score_type is known, scores are unknown, but stored inside corpus.stats : extract them then do actual function
-        # score_type is known, scores are unkown, can't be found inside corpus_stats : get them w/ default then do actual function
-        # score_type is known, scores are unknown, and not stored : get them w/ default param then do actual function
-
-        if self.content_type == "text":
-            raise TypeError('Content type is not corpus, please load something else to use this function.')
-        if score_type not in list(self.score_types['no_argument_needed'].keys()) + list(self.score_types['argument_needed'].keys()):
-            raise RuntimeError("the score type '", score_type ,"' is not recognized by the current Readability object, please pick one from", list(self.score_types['no_argument_needed'].keys()) + list(self.score_types['argument_needed'].keys()))
-        if score_type is not None:
-            if not hasattr(self,"corpus_statistics"):
-                print("Suggestion : Use Readability.compile() beforehand to allow the Readability object to store information when using other methods.")
-                if scores is not None:
-                    # Case : user provides scores even though .compile() was never used, trust these scores and perform next function.
-                    print("Now using user-provided scores from 'scores' argument")
-                    pass
-                else:
-                    # Case : user provides no scores and cannot refer to self to find the scores, so use corresponding function with default parameters.
-                    scores = self.do_function_with_default_arguments(score_type)
-
-            elif not hasattr(self.corpus_statistics[self.classes[0]][0],score_type):
-                # Case : self.corpus_statistics exists, but scores aren't found when referring to self, so using corresponding function with default parameters.
-                scores = self.do_function_with_default_arguments(score_type)
-            else:
-                # Case : scores found via referring to self.corpus_statistics, so just extract them.
-                scores = {}
-                for level in self.classes:
-                    scores[level] = []
-                    for score_dict in self.corpus_statistics[level]:
-                        scores[level].append(score_dict.__dict__[score_type])
-
-            return scores
-    
-
-    def remove_outliers(self, stddevratio=1, score_type=None, scores=None):
-        """
-        Outputs a corpus, after removing texts which are considered to be "outliers", based on a standard deviation ratio
-        A text is an outlier if its value value is lower or higher than this : mean +- standard_deviation * ratio
-        In order to exploit this new corpus, you'll need to make a new Readability instance.
-        For instance : new_r = Readability(r.remove_outliers(r.perplexity(),1))
-
-        :return: a corpus, in a specific format where texts are represented as lists of sentences, which are lists of words.
-        :rtype: dict[str][str][str][str]
-        """
-        scores = self.get_corpus_scores(score_type,scores)
-        moy = list()
-        for level in self.classes:
-            inner_moy=0
-            for score in scores[level]:
-                inner_moy+= score/len(scores[level])
-            moy.append(inner_moy)
-
-        stddev = list()
-        for index, level in enumerate(self.classes):
-            inner_stddev=0
-            for score in scores[level]:
-                inner_stddev += ((score-moy[index])**2)/len(scores[level])
-            inner_stddev = math.sqrt(inner_stddev)
-            stddev.append(inner_stddev)
-
-        outliers_indices = scores.copy()
-        for index, level in enumerate(self.classes):
-            outliers_indices[level] = [idx for idx in range(len(scores[level])) if scores[level][idx] > moy[index] + (stddevratio * stddev[index]) or scores[level][idx] < moy[index] - (stddevratio * stddev[index])]
-            print("nb textes enleves(",level,") :", len(outliers_indices[level]),sep="")
-            print(outliers_indices[level])
-
-        corpus_no_outliers = copy.deepcopy(scores)
-        for level in self.classes:
-            offset = 0
-            for index in outliers_indices[level][:]:
-                corpus_no_outliers[level].pop(index - offset)
-                offset += 1
-            print("New number of texts for class", level, ":", len(corpus_no_outliers[level]))
-        print("In order to use this new corpus, you'll have to make a new Readability instance.")
-        return corpus_no_outliers
-
-
-    def stub_generalize_get_score(self, func, func_args , score_name):
-        """
-        Stub for functions that do the same logic when calculating a score and then potentially assign it to .corpus_statistics or else
-
-        func is just a reference to the function
-        func_args is a tuple  with the needed arguments for a text.
-        score_name is the name of the score to assign to .corpus_statistics in order to re-use it in other methods.
-        """
-        if self.content_type == "text":
-            print(func_args)
-            print(*(func_args))
-            return func(self.content, *(func_args))
-        elif self.content_type == "corpus":
-            scores = {}
-            for level in self.classes:
-                temp_score = 0
-                scores[level] = []
-                for index,text in enumerate(self.content[level]):
-                    scores[level].append(func(text, *(func_args)))
-                    temp_score += scores[level][index]
-                    if hasattr(self, "corpus_statistics"):
-                        setattr(self.corpus_statistics[level][index],score_name,scores[level][index])
-                temp_score = temp_score / len(scores[level])
-                print("class", level, "mean score :" ,temp_score)
-            return scores
-        else:
-            return -1
-
-
-    def compile(self):
-        """
-        Calculates a bunch of statistics to make some underlying functions faster.
-        Returns a copy of a Readability instance, supplemented with a "statistics" or "corpus_statistics" attribute that can be used for other functions.
-        """
-        #TODO : debloat this and/or refactor it since we copy-paste almost the same below
-        if self.content_type == "text":
-            totalWords = 0
-            totalLongWords = 0
-            totalSentences = len(self.content)
-            totalCharacters = 0
-            totalSyllables = 0
-            nbPolysyllables = 0
-            for sentence in self.content:
-                totalWords += len(sentence)
-                totalLongWords += len([token for token in sentence if len(token)>6])
-                totalCharacters += sum(len(token) for token in sentence)
-                totalSyllables += sum(utils.syllablesplit(word) for word in sentence)
-                nbPolysyllables += sum(utils.syllablesplit(word) for word in sentence if utils.syllablesplit(word)>=3)
-                #nbPolysyllables += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
-            self.statistics = Statistics()
-            self.statistics.totalWords = totalWords
-            self.statistics.totalLongWords = totalLongWords
-            self.statistics.totalSentences = totalSentences
-            self.statistics.totalCharacters = totalCharacters
-            self.statistics.totalSyllables = totalSyllables
-            self.statistics.nbPolysyllables = nbPolysyllables
-            return self
-        elif self.content_type == "corpus":
-            stats = {}
-            for level in self.classes:
-                stats[level] = []
-                for text in self.content[level]:
-                    #This could be turned into a subroutine instead of copy pasting...
-                    totalWords = 0
-                    totalLongWords = 0
-                    totalSentences = len(text)
-                    totalCharacters = 0
-                    totalSyllables = 0
-                    nbPolysyllables = 0
-                    for sentence in text:
-                        totalWords += len(sentence)
-                        totalLongWords += len([token for token in sentence if len(token)>6])
-                        totalCharacters += sum(len(token) for token in sentence)
-                        totalSyllables += sum(utils.syllablesplit(word) for word in sentence)
-                        nbPolysyllables += sum(utils.syllablesplit(word) for word in sentence if utils.syllablesplit(word)>=3)
-                        #nbPolysyllables += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
-                    statistics = Statistics()
-                    #TODO : make code less bloated by doing something like this : 
-                    #for p in params:
-                    #    setattr(self.statistics, p, p[value])
-                    statistics.totalWords = totalWords
-                    statistics.totalLongWords = totalLongWords
-                    statistics.totalSentences = totalSentences
-                    statistics.totalCharacters = totalCharacters
-                    statistics.totalSyllables = totalSyllables
-                    statistics.nbPolysyllables = nbPolysyllables
-                    stats[level].append(statistics)
-            self.corpus_statistics = stats
-            return self
-        return -1
-
-    def stats(self):
-        """
-        Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.
-        In this case, this will output the mean values of each score for each class.
-        """
-        if hasattr(self, "statistics"):
-            for stat in self.statistics.__dict__:
-                print(stat, "=", self.statistics.__dict__[stat])
-
-        # NOTE: Might more more useful to instead return the mean values of each class in the corpus.
-        elif hasattr(self, "corpus_statistics"):
-            for level in self.classes:
-                class_values = dict.fromkeys(self.corpus_statistics[level][0].__dict__, 0)
-                for stats in self.corpus_statistics[level]:
-                    for stat in stats.__dict__:
-                        class_values[stat] += stats.__dict__[stat]
-                print("Mean values for class :",level)
-                class_values.update((key, round(value/len(self.corpus_statistics[level]),2)) for key,value in class_values.items())
-                print(class_values)
-        else:
-            print("You need to use the .compile() function before in order to view this",self.content_type,"' statistics")
-
-
-    # NOTE: Maybe this should go in the stats subfolder to have less bloat.
-    def corpus_info(self):
-        """
-        Output several basic statistics such as number of texts, sentences, or tokens, alongside size of the vocabulary.
-            
-        :param corpus: Dictionary of lists of sentences (represented as a list of tokens)
-        :type corpus: dict[class][text][sentence][token]
-        :return: a pandas dataframe 
-        :rtype: pandas.core.frame.DataFrame
-        """
-        if self.content_type != "corpus":
-            raise TypeError("Current type is not recognized as corpus. Please provide a dictionary with the following format : dict[class][text][sentence][token]")
-        else:
-            # Extract the classes from the dictionary's keys.
-            corpus = self.content
-            levels = self.classes
-            cols = levels + ['total']
-
-            # Build vocabulary
-            vocab = dict()
-            for level in levels:
-                vocab[level] = list()
-                for text in corpus[level]:
-                    unique = set()
-                    for sent in text:
-                        #for sent in text['content']:
-                        for token in sent:
-                            unique.add(token)
-                        vocab[level].append(unique)
-            
-            # Number of texts, sentences, and tokens per level, and on the entire corpus
-            nb_ph_moy= list()
-            nb_ph = list()
-            nb_files = list()
-            nb_tokens = list()
-            nb_tokens_moy = list()
-            len_ph_moy = list()
-
-            for level in levels:
-                nb_txt = len(corpus[level])
-                nb_files.append(nb_txt)
-                nbr_ph=0
-                nbr_ph_moy =0
-                nbr_tokens =0
-                nbr_tokens_moy =0
-                len_phr=0
-                len_phr_moy=0
-                for text in corpus[level]:
-                    nbr_ph+=len(text)
-                    temp_nbr_ph = min(len(text),1) # NOTE : not sure this is a good idea.
-                    nbr_ph_moy+=len(text)/nb_txt
-                    for sent in text:
-                        nbr_tokens+=len(sent)
-                        nbr_tokens_moy+= len(sent)/nb_txt
-                        len_phr+=len(sent)
-                    len_phr_moy+=len_phr/temp_nbr_ph
-                    len_phr=0
-                len_phr_moy = len_phr_moy/nb_txt
-                nb_tokens.append(nbr_tokens)
-                nb_tokens_moy.append(nbr_tokens_moy)
-                nb_ph.append(nbr_ph)
-                nb_ph_moy.append(nbr_ph_moy)
-                len_ph_moy.append(len_phr_moy)
-            nb_files_tot = sum(nb_files)
-            nb_ph_tot = sum(nb_ph)
-            nb_tokens_tot = sum(nb_tokens)
-            nb_tokens_moy_tot = nb_tokens_tot/nb_files_tot
-            nb_ph_moy_tot = nb_ph_tot/nb_files_tot
-            len_ph_moy_tot = sum(len_ph_moy)/len(levels)
-            nb_files.append(nb_files_tot)
-            nb_ph.append(nb_ph_tot)
-            nb_tokens.append(nb_tokens_tot)
-            nb_tokens_moy.append(nb_tokens_moy_tot)
-            nb_ph_moy.append(nb_ph_moy_tot)
-            len_ph_moy.append(len_ph_moy_tot)
-
-            # Vocabulary size per class
-            taille_vocab =list()
-            taille_vocab_moy=list()
-            all_vocab =set()
-            for level in levels:
-                vocab_level = set()
-                for text in vocab[level]:
-                    for token in text:
-                        all_vocab.add(token)
-                        vocab_level.add(token)
-                taille_vocab.append(len(vocab_level))
-
-            taille_vocab.append(len(all_vocab))
-
-            # Mean size of vocabulary
-            taille_vocab_moy = list()
-            taille_moy_total = 0
-            for level in levels:
-                moy=0
-                for text in vocab[level]:
-                    taille_moy_total+= len(text)/nb_files_tot
-                    moy+=len(text)/len(vocab[level])
-                taille_vocab_moy.append(moy)
-            taille_vocab_moy.append(taille_moy_total)  
-
-            # The resulting dataframe can be used for statistical analysis.
-            df = pd.DataFrame([nb_files,nb_ph,nb_ph_moy,len_ph_moy,nb_tokens,nb_tokens_moy,taille_vocab,taille_vocab_moy],columns=cols)
-            df.index = ["Nombre de fichiers","Nombre de phrases total","Nombre de phrases moyen","Longueur moyenne de phrase","Nombre de tokens", "Nombre de token moyen","Taille du vocabulaire", "Taille moyenne du vocabulaire"]
-            return round(df,0)

@@ -55,7 +55,6 @@ from gensim.matutils import cossim
 
 spacy_pronoun_tags = ["PRON", "PRP", "PRP$", "WP", "WP$", "PDAT", "PDS", "PIAT", "PIDAT", "PIS", "PPER", "PPOSAT", "PPOSS", "PRELAT", "PRELS", "PRF", "PWAT", "PWAV", "PWS", "PN"]
 DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
-fauconnier_model = None
 
 # Pos-tag based features : 
 # TODO : make a wrapper | decorator to indicate that these do pretty much the same thing
@@ -64,7 +63,6 @@ def nb_pronouns(text, nlp = None, mode="text"):
     # Pronoun tags available here, https://github.com/explosion/spaCy/blob/master/spacy/glossary.py
     def spacy_filter(doc, nlp):
         return [token.text for token in nlp(doc) if (token.pos_ in spacy_pronoun_tags)]
-    
     return utils.count_occurences_in_document(text, spacy_filter, nlp, mode)
 
 def nb_articles(text, nlp=None, mode="text"):
@@ -132,30 +130,12 @@ def average_cosine_similarity_tfidf(text, nlp = None, mode="text"):
 
     return average_cosine_similarity
 
-def average_cosine_similarity_LDA(text, nlp = None, mode="text"):
+def average_cosine_similarity_LDA(model, text, nlp = None, mode="text"):
     """
     Returns the average cosine similarity between adjacent sentences in a text.
     By using the 'mode' parameter, can use inflected forms of words or their lemmas.
     Valid values for mode are : 'text', 'lemma'.
     """
-    global fauconnier_model
-    # Get French word2vecmodel from Jean Phillipe Fauconnier : https://fauconnier.github.io/#data
-    if fauconnier_model is None:
-        try:
-            with open(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), "rb") as f:
-                model = KeyedVectors.load_word2vec_format(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), binary=True, unicode_errors="ignore")
-                fauconnier_model = model
-        except IOError:
-            url = "https://embeddings.net/embeddings/frWac_no_postag_no_phrase_500_cbow_cut100.bin"
-            print("WARNING : Acquiring french word2vec model remotely since model was not found locally.")
-            response = requests.get(url)
-            with open(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), "wb") as f:
-                f.write(response.content)
-            model = KeyedVectors.load_word2vec_format(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), binary=True, unicode_errors="ignore")
-            fauconnier_model = model
-    else:
-        model = fauconnier_model
-
     # Group sentences together and keep text or lemmas
     sentences = utils.convert_text_to_sentences(text, nlp)
     prepped_text = []
