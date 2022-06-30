@@ -189,10 +189,9 @@ class Readability:
             self.nlp = None
         
         # Handling text that needs to be converted into lists of tokens
-        self.content_type = "text"
         self.content = utils.convert_text_to_sentences(content,self.nlp)
 
-        # Handling corpus that probably is a corpus
+        # Handling what is probably a corpus
         # Reminder, structure needed is : dict => list of texts => list of sentences => list of words
         # TODO : check this with a bunch of edge cases
         #if type(content) == dict:
@@ -205,13 +204,6 @@ class Readability:
         #    #else, check if the structure is dict[class][text].. and tokenize everything (warn user it'll take some time)
         #    #and then use that as the new structure
         
-        if self.content_type == "text":
-            nb_words = 0
-            for sentence in self.content:
-                nb_words += len(sentence)
-            if nb_words < 101:
-                print("WARNING: Text length is less than 100 words, some scores will be inaccurate.")
-
         # This dictionary associates values with the functions used to calculate them, alongside the dependencies needed.
         self.informations = dict(
             gfi=dict(function=self.gfi,dependencies=[]),
@@ -245,17 +237,25 @@ class Readability:
             for dependency in information["dependencies"]:
                 dependencies_to_add.add(dependency)
 
-        #Create a dependencies dictionary, and put what's needed in there after loading the external ressources
+        # Create a dependencies dictionary, and put what's needed in there after loading the external ressources
         self.dependencies = {}
         for dependency in dependencies_to_add:
             self.dependencies[dependency] = utils.load_dependency(dependency)
 
+
+    # Utility functions : parse/load/checks
+    def parse(self,text):
+        """Creates a ParsedText instance that relies on the ReadabilityProcessor in order to output various readability measures."""
+        return parsed_text.ParsedText(text,self)
+
+    #NOTE : maybe also provide load_dependency(self,value)
     def load(self,value):
         """
-        TODO: doc
-        also give success message telling user what happened instead of return 0
+        Checks if a measure or value has been excluded, enables it and loads its dependencies if needed.
+
+        :param str value: A valid measure or value that appears in self.informations at start-up.
         """
-        # Based on the value's name, check if exists in self.excluded_informations, return error or warning if so:
+        # Based on the value's name, check if exists in self.excluded_informations
         if value in list(self.excluded_informations.keys()):
             # Transpose back to self.informations
             self.informations[value] = self.excluded_informations[value]
@@ -267,29 +267,35 @@ class Readability:
                     self.dependencies[dependency] = utils.load_dependency(dependency)
 
         elif value in list(self.informations.keys()):
-            # Check if it's in self.informations to tell user it's already loaded
+            # Check if it's in self.informations to warn user it's already loaded
             print("No need to call .load(",value,"), value already exists in instance.informations[",value,"]",sep="")
             print(self.informations[value])
         else:
             # Raise error to tell user this measure isn't recognized
             raise ValueError("Value",value,"was not recognized as par of instance.informations or instance.excluded_informations, Please check if you've done a typo.")
     
-    def parse(self,text):
+    def check_score_and_dependencies_available(self,score_name):
         """
-        TODO: doc
+        TODO doc
         """
-        return parsed_text.ParsedText(text,self)
+        if score_name not in list(self.informations.keys()):
+            print("Value", score_name, "was not found in instance.informations. Please check if you excluded it when initializing the ReadabilityProcessor.")            
+            return False
+        else:
+            if score_name in list(self.informations.keys()):
+                dependencies = self.informations[score_name]["dependencies"]
+            else:
+                dependencies = self.excluded_informations[score_name]["dependencies"]
+            for dependency_name in dependencies:
+                if dependency_name not in list(self.dependencies.keys()):
+                    print("Dependency", dependency_name, "was not found in instance.dependencies. Something's gone wrong")
+                    return False
+        return True
 
-    def score(self, name):
-        """
-        This function calls the relevant score from the submodule common_scores, based on the information possessed by the current instance
-        First, it determines whether we're dealing with a text or a corpus via the use of self.content_type
-        Then, it checks whether the current text was compiled by checking if self.statistics or self.corpus_statistics exists.
-        It then calls the score for a text, or returns a dictionary containing lists of scores in the same format as a corpus (dict{class[score]})
 
-        :param name: Content of a text, or a corpus
-        :type name: str, list(str), list(list(str)), converted into list(list(str)) or dict[class][text][sentence][token]
-        """
+    # Traditional measures: 
+    def score(self, name, content, statistics = None):
+        """This function calls a score's calculation from the submodule common_scores"""
         if name == "gfi":
             func = common_scores.GFI_score
         elif name == "ari":
@@ -303,57 +309,39 @@ class Readability:
         elif name == "rel":
             func = common_scores.REL_score
 
-        if self.content_type == "text":
-            if hasattr(self, "statistics"):
-                return func(self.content, self.statistics)
-            else:
-                return func(self.content)
-        elif self.content_type == "corpus":
-            scores = {}
-            for level in self.classes:
-                scores[level] = []
-                if hasattr(self, "corpus_statistics"):
-                    for statistics in self.corpus_statistics[level]:
-                        scores[level].append(func(None, statistics))
-                else:
-                    for text in self.content[level]:
-                        scores[level].append(func(text))
-            for level in self.classes:
-                temp_score = 0
-                for index,score in enumerate(scores[level]):
-                    temp_score += score
-                    if hasattr(self, "corpus_statistics"):
-                        setattr(self.corpus_statistics[level][index],name,score)
-                temp_score = temp_score / len(scores[level])
-                print("class", level, "mean score :" ,temp_score)
-            return scores
+        if not self.check_score_and_dependencies_available(name):
+            raise RuntimeError("measure", name, "cannot be calculated.")
+        if statistics is not None:
+            return func(content, statistics)
         else:
-            return -1
+            return func(content)
         
-    def gfi(self):
+    def gfi(self, content):
         """Returns Gunning Fog Index"""
-        return self.score("gfi")
+        return self.score("gfi", content)
 
-    def ari(self):
+    def ari(self, content):
         """Returns Automated Readability Index"""
-        return self.score("ari")
+        return self.score("ari", content)
 
-    def fre(self):
+    def fre(self, content):
         """Returns Flesch Reading Ease"""
-        return self.score("fre")
+        return self.score("fre", content)
 
-    def fkgl(self):
+    def fkgl(self, content):
         """Returns Flesch–Kincaid Grade Level"""
-        return self.score("fkgl")
+        return self.score("fkgl", content)
 
-    def smog(self):
+    def smog(self, content):
         """Returns Simple Measure of Gobbledygook"""
-        return self.score("smog")
+        return self.score("smog", content)
 
-    def rel(self):
+    def rel(self, content):
         """Returns Reading Ease Level (Adaptation of FRE for french)"""
-        return self.score("rel")
+        return self.score("rel", content)
 
+    #TODO : repurpose this inside ParsedText as a traditional-only version (for reproducing the paper's contents)
+    # and a version with every available score
     def scores(self):
         """
         Depending on type of content provided, returns a list of common readability scores (type=text),
@@ -379,6 +367,8 @@ class Readability:
                 values[score] = self.score(score)
             return values
 
+
+    # Measures related to perplexity:
     def perplexity(self,content):
         """
         Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
@@ -392,56 +382,41 @@ class Readability:
         print("Please be patient, pseudo-perplexity takes a lot of time to calculate.")
         return perplexity.PPPL_score(self.dependencies["GPT2_LM"],content)
     
-    def check_score_and_dependencies_available(self,score_name):
-        """
-        TODO doc
-        """
-        if score_name not in list(self.informations.keys()):
-            print("Value", score_name, "was not found in instance.informations. Please check if you excluded it when initializing the ReadabilityProcessor.")            
-            return False
-        else:
-            if score_name in list(self.informations.keys()):
-                dependencies = self.informations[score_name]["dependencies"]
-            else:
-                dependencies = self.excluded_informations[score_name]["dependencies"]
-            for dependency_name in dependencies:
-                if dependency_name not in list(self.dependencies.keys()):
-                    print("Dependency", dependency_name, "was not found in instance.dependencies. Something's gone wrong")
-                    return False
-        return True
+    def stub_rsrs():
+        #TODO : check submodule for implementation details
+        print("not implemented yet")
+        return -1
+    
 
-
-    def diversity(self, type, mode=None):
+    # Measures related to text diversity:
+    def diversity(self, content, ratio_type, formula_type=None):
         """
         Outputs a measure of text diversity based on which feature to use, and which version of the formula is used.
-        If using this for a corpus instead of a text, returns a dictionary containing the relevant scores.
-        
+        Default formula is "nb lexical items / nb unique lexical items",
+        'root' formula uses the square root for the denominator,
+        'corrected' formula mutliplies the number of words by two before taking the square root for the denominator.
+
         :param str type: Which text diversity measure to use : "ttr" is text token ratio, "ntr" is noun token ratio
         :param str mode: What kind of formula version to use, if applicable : "corrected", "root", and default standard are available for token ratios.
         :return: a measure of text diversity, or a dictionary of these measures
         :rtype: :rtype: Union[float,dict[str][list(float)]]
         """
-        if type == "ttr":
+        if ratio_type == "ttr":
             func = diversity.type_token_ratio
-        elif type == "ntr":
+        elif ratio_type == "ntr":
             func = diversity.noun_token_ratio
 
-        if self.content_type == "text":
-            return func(self.content, self.nlp, mode)
-        elif self.content_type == "corpus":
-            scores = {}
-            for level in self.classes:
-                temp_score = 0
-                scores[level] = []
-                for index,text in enumerate(self.content[level]):
-                    scores[level].append(func(text, self.nlp, mode))
-                    temp_score += scores[level][index]
-                    if hasattr(self, "corpus_statistics"):
-                        setattr(self.corpus_statistics[level][index],locals()['type'],scores[level][index])
-                temp_score = temp_score / len(scores[level])
-                print("class", level, "mean score :" ,temp_score)
-            return scores
+        if not self.check_score_and_dependencies_available(ratio_type):
+            raise RuntimeError("measure", formula_type, "cannot be calculated.")
+        return func(content, self.nlp, formula_type)
 
+    def ttr(self, content, formula_type=None):
+        """Returns Text Token Ratio: number of unique words / number of words"""
+        return self.diversity(content, "ttr",formula_type)
+
+    def ntr(self, content, formula_type=None):
+        """Returns Noun Token Ratio: number of unique nouns / number of nouns"""
+        return self.diversity(content, "ntr",formula_type)
 
     def dubois_proportion(self, filter_type = "total", filter_value = None):
         """
@@ -539,9 +514,7 @@ class Readability:
         return self.stub_generalize_get_score(func, (self.nlp,mode), "score_lda")
 
 
-    def stub_rsrs():
-        #TODO : check sobmodule for implementation details
-        return -1
+    
 
 
     def stub_SVM():

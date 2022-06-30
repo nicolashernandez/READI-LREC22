@@ -67,7 +67,6 @@ class ParsedText:
             self.statistics["totalLongWords"] += len([token for token in sentence if len(token)>6])
             self.statistics["totalCharacters"] += sum(len(token) for token in sentence)
             self.statistics["totalSyllables"] += sum(utils.syllablesplit(word) for word in sentence)
-            #wait why the fuck does this give me 0 syllables?
             self.statistics["nbPolysyllables"] += sum(utils.syllablesplit(word) for word in sentence if utils.syllablesplit(word)>=3)
             #self.statistics["nbPolysyllables"] += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
     
@@ -101,13 +100,52 @@ class ParsedText:
     # I suppose I could make a call_function(func_args) subroutine, but I wonder what happens if func_args is empty
     # Does doing *(func_args) result in nothing, or is an empty argument added?
 
+    def traditional_score(self,score_name):
+        if self.scores[score_name] == None:
+            self.scores[score_name] = self.readability_processor.score(score_name,self.content,self.statistics)
+        return self.scores[score_name]
+    
+    def gfi(self):
+        """Returns Gunning Fog Index"""
+        return self.traditional_score("gfi")
+
+    def ari(self):
+        """Returns Automated Readability Index"""
+        return self.traditional_score("ari")
+
+    def fre(self):
+        """Returns Flesch Reading Ease"""
+        return self.traditional_score("fre")
+
+    def fkgl(self):
+        """Returns Flesch–Kincaid Grade Level"""
+        return self.traditional_score("fkgl")
+
+    def smog(self):
+        """Returns Simple Measure of Gobbledygook"""
+        return self.traditional_score("smog")
+
+    def rel(self):
+        """Returns Reading Ease Level (Adaptation of FRE for french)"""
+        return self.traditional_score("rel")
+
+
     def perplexity(self):
         if self.scores["pppl"] == None:
             self.scores["pppl"] = self.readability_processor.perplexity(self.content)
         return self.scores["pppl"]
 
-    def diversity(self, type, mode=None):
-        if self.scores["pppl"] == None:
-            self.scores["pppl"] = self.readability_processor.diversity(self.content,type, mode)
-        return self.scores["pppl"]
+
+    def diversity(self, ratio_type, formula_type=None):
+        if self.scores[ratio_type] == None:
+            self.scores[ratio_type] = self.readability_processor.diversity(self.content, ratio_type, formula_type)
+        return self.scores[ratio_type]
+
+    def ttr(self, formula_type=None):
+        """Returns Text Token Ratio: number of unique words / number of words"""
+        return self.diversity("ttr", formula_type)
+
+    def ntr(self, formula_type=None):
+        """Returns Noun Token Ratio: number of nouns / number of nouns"""
+        return self.diversity("ntr", formula_type)
     

@@ -25,7 +25,7 @@ def GFI_score(text, statistics=None):
     """
     #FIXME : this score is wrong since we divided by totalSentences instead of totalWords for the second ratio. Leaving as-is for now.
     if statistics is not None:
-        return 0.4*((statistics.totalWords/statistics.totalSentences) + 100*statistics.totalLongWords/statistics.totalSentences)
+        return 0.4*((statistics["totalWords"]/statistics["totalSentences"]) + 100*statistics["totalLongWords"]/statistics["totalSentences"])
     totalWords = 0
     totalSentences = len(text)
     totalLongWords = 0
@@ -54,7 +54,7 @@ def ARI_score(text, statistics=None):
     """
     #FIXME : this score is wrong since we multiplied each ratio by 4.71 instead of doing it only for the first one.
     if statistics is not None:
-        return 4.71*((statistics.totalCharacters/statistics.totalWords) + 0.5*statistics.totalWords/statistics.totalSentences)-21.43
+        return 4.71*((statistics["totalCharacters"]/statistics["totalWords"]) + 0.5*statistics["totalWords"]/statistics["totalSentences"])-21.43
     totalWords = 0
     totalSentences = len(text)
     totalCharacters = 0
@@ -78,7 +78,7 @@ def FRE_score(text, statistics=None):
     :rtype: float
     """
     if statistics is not None:
-        return 206.835-1.015*(statistics.totalWords/statistics.totalSentences)-84.6*(statistics.totalSyllables/statistics.totalWords)
+        return 206.835-1.015*(statistics["totalWords"]/statistics["totalSentences"])-84.6*(statistics["totalSyllables"]/statistics["totalWords"])
     totalWords = 0
     totalSentences = len(text)
     totalSyllables = 0
@@ -102,7 +102,7 @@ def FKGL_score(text, statistics=None):
     :rtype: float
     """
     if statistics is not None:
-        return 0.39*(statistics.totalWords/statistics.totalSentences)+11.8*(statistics.totalSyllables/statistics.totalWords)-15.59
+        return 0.39*(statistics["totalWords"]/statistics["totalSentences"])+11.8*(statistics["totalSyllables"]/statistics["totalWords"])-15.59
     totalWords = 0
     totalSentences = len(text)
     totalSyllables = 0
@@ -128,7 +128,7 @@ def SMOG_score(text, statistics=None):
     # FIXME : the nbPolysyllables erroneously returns their own number of syllables instead of incrementing the counter by one.
     # Keeping as is for now
     if statistics is not None:
-        return 1.043*math.sqrt(statistics.nbPolysyllables*(30/statistics.totalSentences))+3.1291
+        return 1.043*math.sqrt(statistics["nbPolysyllables"]*(30/statistics["totalSentences"]))+3.1291
     totalSentences = len(text)
     nbPolysyllables = 0
     for sent in text:
@@ -151,7 +151,7 @@ def REL_score(text, statistics=None):
     :rtype: float
     """
     if statistics is not None:
-        return 207-1.015*(statistics.totalWords/statistics.totalSentences)-73.6*(statistics.totalSyllables/statistics.totalWords)
+        return 207-1.015*(statistics["totalWords"]/statistics["totalSentences"])-73.6*(statistics["totalSyllables"]/statistics["totalWords"])
     totalWords = 0
     totalSentences = len(text)
     totalSyllables = 0

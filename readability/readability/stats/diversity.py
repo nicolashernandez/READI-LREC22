@@ -6,16 +6,8 @@ For instance, mode == "root" will square the denominator of the ratio, and is su
 import math
 import string
 from ..utils import utils
-# Lexico-semantic features :
-# ~ Difficulty of voc in text, like TTR/RTTR/CTTR.
-# need to find something about yule's k it seems to be used sometimes, but what does it mean?
-# Other stuff : n-gram lexical features, like word or character n-grams.
-# POS based lexical features (i.e ttr but with nouns or other stuff)
-# Can also do density (percentage of content words and function words)
-# Also need to do word-list based features, 
+# Things that could be added : Yule's k, lexical density measures, n-gram lexical features
 
-
-# The following measures are for text diversity:
 def type_token_ratio(text, nlp = None, mode = None):
     """
     Outputs two ratios : ttr and root ttr : number of lexical items / number of words
@@ -55,7 +47,7 @@ def type_token_ratio(text, nlp = None, mode = None):
         return(nb_unique/nb_tokens)
 
 # The following methods use a spacy model to recognize lexical items.
-def noun_token_ratio(text,nlp=None, mode = None):
+def noun_token_ratio(text, nlp = None, mode = None):
     """
     Outputs variant of the type token ratio, the TotalNoun/Noun Ratio.
 
@@ -79,14 +71,11 @@ def noun_token_ratio(text,nlp=None, mode = None):
         return 0
 
     if mode == "corrected":
-        #print("DEBUG: Returning Corrected TTR ratio = ",nb_unique,"/",math.sqrt(2*nb_tokens),":",nb_unique/math.sqrt(2*nb_tokens))
         return(nb_unique/math.sqrt(2*nb_tokens))
     
     elif mode == "root":
-        #print("DEBUG: Returning Root TTR ratio = ",nb_unique,"/",mqth.sqrt(nb_tokens),":",nb_unique/math.sqrt(nb_tokens))
         return(nb_unique/math.sqrt(nb_tokens))
     
     else:
-        #print("DEBUG: Returning TTR ratio = ",nb_unique,"/",nb_tokens,":",nb_unique/nb_tokens)
         return(nb_unique/nb_tokens)
     
