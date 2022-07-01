@@ -25,12 +25,12 @@ class ParsedCollection:
         """
         self.readability_processor = readability_processor
 
-        # Converting text into a list(list(str)) format in order to properly seperate sentences and tokens.
-        # NOTE: Placerholder creation of self.content.
-        self.content = dict(dummy = list_of_texts)
+
+        # TODO: Placeholder creation of self.content, create a function that converts different types of (labels, texts) collections into the same structure
+        # Also, if using a list of texts, make a dict(default = list_of_texts) for compatibility, we'll suppose every text has the same label.
+        self.content = dict(default = list_of_texts)
 
         # Initialize scores by setting them all to None
-        #wait no, should be another way of assigning labels AND showing it's not calculated yet..
         self.scores = dict()
         for info in list(readability_processor.informations.keys()):
             self.scores[info] = dict()
@@ -85,6 +85,12 @@ class ParsedCollection:
             for stat in list(self.statistics[label].keys()):
                 print(stat, "=", self.statistics[label][stat])
 
+    #ok so : do this thing where .informations gets additional dict{default_func_args : {valueX : X, valueY : Y}}
+    # and get the values by calling machin.bidule.values() tout simplement.
+    #Bon aprés faut espérer qu'elles soient dans l'ordre.
+    # Mais ça devrait être bon.
+    #Aprés on peut implémenter call_score, tout en laissant explicite les autres fonctions
+    # et c'est bingo pour debloat aprés.
     #def stub_call_score(self,score_name):
     #    # check if score_name already in scores:
     #    if self.scores[score_name] is not None:
@@ -106,7 +112,7 @@ class ParsedCollection:
         # Check if scores exist, otherwise calculate 
         for label in list(self.content.keys()):
             if self.scores[score_name][label] == None:
-                # Calculate score thanks to ParsedText
+                # Get every ParsedText score (or let them calculate it)
                 moy = 0
                 for text in self.content[label]:
                     moy += text.traditional_score(score_name)
@@ -115,6 +121,8 @@ class ParsedCollection:
             else:
                 # Just get the score
                 moy_score[label] = self.scores[score_name][label]
+        # TODO : Add pearson coefficients too. According to stats/common_scores, need to flatten each text into a list, and have a list of labels with corresponding indexes.
+        # Should be quick to reproduce
         return moy_score
     
     def gfi(self):
@@ -144,21 +152,46 @@ class ParsedCollection:
 
     # Measures related to perplexity
     def perplexity(self):
-        if self.scores["pppl"] == None:
-            self.scores["pppl"] = self.readability_processor.perplexity(self.content)
-        return self.scores["pppl"]
+        moy_score = dict()
+        for label in list(self.content.keys()):
+            if self.scores["pppl"][label] == None:
+                print("Now calculating perplexity for class:",label)
+                moy = 0
+                for text in self.content[label]:
+                    moy += text.perplexity()
+                self.scores["pppl"][label] = moy / len(self.content[label])
+                moy_score[label] = self.scores["pppl"][label]
+            else:
+                moy_score[label] = self.scores["pppl"][label]
+        return moy_score
     
     def stub_rsrs(self):
-        if self.scores["rsrs"] == None:
-            self.scores["rsrs"] = self.readability_processor.stub_rsrs(self.content)
-        return self.scores["rsrs"]
+        moy_score = dict()
+        for label in list(self.content.keys()):
+            if self.scores["rsrs"][label] == None:
+                moy = 0
+                for text in self.content[label]:
+                    moy += text.stub_rsrs()
+                self.scores["rsrs"][label] = moy / len(self.content[label])
+                moy_score[label] = self.scores["rsrs"][label]
+            else:
+                moy_score[label] = self.scores["rsrs"][label]
+        return moy_score
 
 
     # Measures related to text diversity
     def diversity(self, ratio_type, formula_type=None, force=False):
-        if self.scores[ratio_type] == None or force:
-            self.scores[ratio_type] = self.readability_processor.diversity(self.content,ratio_type,formula_type)
-        return self.scores[ratio_type]
+        moy_score = dict()
+        for label in list(self.content.keys()):
+            if self.scores[ratio_type][label] == None or force:
+                moy = 0
+                for text in self.content[label]:
+                    moy += text.diversity(ratio_type,formula_type,force)
+                self.scores[ratio_type][label] = moy / len(self.content[label])
+                moy_score[label] = self.scores[ratio_type][label]
+            else:
+                moy_score[label] = self.scores[ratio_type][label]
+        return moy_score
 
     def ttr(self, formula_type=None, force=False):
         """Returns Text Token Ratio: number of unique words / number of words"""
@@ -171,14 +204,30 @@ class ParsedCollection:
 
     # Measures based on pre-existing word lists
     def dubois_proportion(self,filter_type="total",filter_value=None, force=False):
-        if self.scores["dubois_buyse_ratio"] == None or force:
-            self.scores["dubois_buyse_ratio"] = self.readability_processor.dubois_proportion(self.content,filter_type,filter_value)
-        return self.scores["dubois_buyse_ratio"]
+        moy_score = dict()
+        for label in list(self.content.keys()):
+            if self.scores["dubois_buyse_ratio"][label] == None or force:
+                moy = 0
+                for text in self.content[label]:
+                    moy += text.dubois_proportion(filter_type,filter_value,force)
+                self.scores["dubois_buyse_ratio"][label] = moy / len(self.content[label])
+                moy_score[label] = self.scores["dubois_buyse_ratio"][label]
+            else:
+                moy_score[label] = self.scores["dubois_buyse_ratio"][label]
+        return moy_score
 
     def average_levenshtein_distance(self,mode="old20", force=False):
-        if self.scores[mode] == None or force:
-            self.scores[mode] = self.readability_processor.average_levenshtein_distance(self.content,mode)
-        return self.scores[mode]
+        moy_score = dict()
+        for label in list(self.content.keys()):
+            if self.scores[mode][label] == None or force:
+                moy = 0
+                for text in self.content[label]:
+                    moy += text.average_levenshtein_distance(mode,force)
+                self.scores[mode][label] = moy / len(self.content[label])
+                moy_score[label] = self.scores[mode][label]
+            else:
+                moy_score[label] = self.scores[mode][label]
+        return moy_score
 
     # NOTE : might do these 3 at start-up instead.
     def count_pronouns(self,mode="text"):
