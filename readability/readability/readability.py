@@ -112,20 +112,20 @@ class Readability:
         
         # This dictionary associates values with the functions used to calculate them, alongside the dependencies needed.
         self.informations = dict(
-            gfi=dict(function=self.gfi,dependencies=[]),
-            ari=dict(function=self.ari,dependencies=[]),
-            fre=dict(function=self.fre,dependencies=[]),
-            fkgl=dict(function=self.fkgl,dependencies=[]),
-            smog=dict(function=self.smog,dependencies=[]),
-            rel=dict(function=self.rel,dependencies=[]),
-            pppl=dict(function=self.perplexity,dependencies=["GPT2_LM"]),
-            dubois_buyse_ratio=dict(function=self.dubois_proportion,dependencies=["dubois_dataframe"]),
-            ttr=dict(function=self.ttr,dependencies=[]),
-            ntr=dict(function=self.ntr,dependencies=[]),
-            old20=dict(function=self.old20,dependencies=["lexique_dataframe"]),
-            pld20=dict(function=self.pld20,dependencies=["lexique_dataframe"]),
-            cosine_similarity_tfidf=dict(function=self.lexical_cohesion_tfidf,dependencies=[]),
-            cosine_similarity_LDA=dict(function=self.lexical_cohesion_LDA,dependencies=["fauconnier_model"])
+            gfi=dict(function=self.gfi,dependencies=[],default_arguments=dict()),
+            ari=dict(function=self.ari,dependencies=[],default_arguments=dict()),
+            fre=dict(function=self.fre,dependencies=[],default_arguments=dict()),
+            fkgl=dict(function=self.fkgl,dependencies=[],default_arguments=dict()),
+            smog=dict(function=self.smog,dependencies=[],default_arguments=dict()),
+            rel=dict(function=self.rel,dependencies=[],default_arguments=dict()),
+            pppl=dict(function=self.perplexity,dependencies=["GPT2_LM"],default_arguments=dict()),
+            dubois_buyse_ratio=dict(function=self.dubois_proportion,dependencies=["dubois_dataframe"],default_arguments=dict(filter_type="total",filter_value=None)),
+            ttr=dict(function=self.ttr,dependencies=[],default_arguments=dict(formula_type = "default")),
+            ntr=dict(function=self.ntr,dependencies=[],default_arguments=dict(formula_type = "default")),
+            old20=dict(function=self.old20,dependencies=["lexique_dataframe"],default_arguments=dict()),
+            pld20=dict(function=self.pld20,dependencies=["lexique_dataframe"],default_arguments=dict()),
+            cosine_similarity_tfidf=dict(function=self.lexical_cohesion_tfidf,dependencies=[],default_arguments=dict(mode="text")),
+            cosine_similarity_LDA=dict(function=self.lexical_cohesion_LDA,dependencies=["fauconnier_model"],default_arguments=dict(mode="text"))
             #following aren't 100% implemented yet
             #bert_value=dict(function=self.stub_BERT,dependencies=["BERT"]),
             #fasttext_value=dict(function=self.stub_fastText,dependencies=["fastText"]),
@@ -280,7 +280,7 @@ class Readability:
         :rtype: :rtype: Union[float,dict[str][list(float)]] 
         """
         if not self.check_score_and_dependencies_available("pppl"):
-            raise RuntimeError("measure 'pppl' cannot be calculated.")
+            raise RuntimeError("measure 'pppl' cannot be calculated, please try ReadabilityProcessor.load('pppl') and try again.")
         #print("Please be patient, pseudo-perplexity takes a lot of time to calculate.")
         return perplexity.PPPL_score(self.dependencies["GPT2_LM"],content)
     

@@ -62,19 +62,7 @@ class ParsedCollection:
                     #self.statistics["nbPolysyllables"] += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
     
     #TODO: convert that to calculate mean scores for each label
-    #def show_scores(self,force=False):
-    #    df = []
-    #    if force:
-    #        for score_name in list(self.scores.keys()):
-    #            if self.scores[score_name] is None:
-    #                # Check if score can be calculated, and if its dependencies are available.
-    #                if self.readability_processor.check_score_and_dependencies_available(score_name):
-    #                   self.scores[score_name] = self.readability_processor.informations[score_name]["function"](self.content)
-    #    
-    #    # Append each already-calculated score to a dataframe
-    #    df.append(self.scores)
-    #    df = pd.DataFrame(df)
-    #    return df
+    
 
     def show_statistics(self):
         """
@@ -84,26 +72,36 @@ class ParsedCollection:
         for label in list(self.content.keys()):
             for stat in list(self.statistics[label].keys()):
                 print(stat, "=", self.statistics[label][stat])
+        #TODO : re-use corpus.info() from utils/corpus_utils to show more stuff
 
-    #ok so : do this thing where .informations gets additional dict{default_func_args : {valueX : X, valueY : Y}}
-    # and get the values by calling machin.bidule.values() tout simplement.
-    #Bon aprés faut espérer qu'elles soient dans l'ordre.
-    # Mais ça devrait être bon.
-    #Aprés on peut implémenter call_score, tout en laissant explicite les autres fonctions
-    # et c'est bingo pour debloat aprés.
-    #def stub_call_score(self,score_name):
-    #    # check if score_name already in scores:
-    #    if self.scores[score_name] is not None:
-    #        return self.scores[score_name]
-    #    # otherwise check if score_name is available in processor:
-    #    elif self.readability_processor.check_score_and_dependencies_available(score_name):
-    #        # If so, then call function : func = readability_processor.informations[score_name][function]
-    #        func = self.readability_processor.informations[score_name]["function"]
-    #        # func_default_args = something #probably can add them to readability_processor.informations[score_name]["default_arguments"].
-    #        func_default_args = "unknown"
-    #        # return func(self.content, func_default_args)
-    #        print("function detected: ",func)
-    #    return 0
+    def call_score(self,score_name):
+        moy_score = dict()
+        # Check if measure already calculated
+        for label in list(self.content.keys()):
+            # If so, then just get it
+            if self.scores[score_name][label] is not None:
+                moy_score[label] = self.scores[score_name][label]
+            elif self.readability_processor.check_score_and_dependencies_available(score_name):
+                #Otherwise, get it if ParsedText items already calculated it, or get them to calculate it.
+                moy = 0
+                for text in self.content[label]:
+                    moy += text.call_score(score_name)
+                self.scores[score_name][label] = moy / len(self.content[label])
+                moy_score[label] = self.scores[score_name][label]
+            else:
+                moy_score[label] = None
+        return moy_score
+
+    def show_scores(self,force=False):
+        df = []
+        if force:
+            for score_name in list(self.scores.keys()):
+                self.scores[score_name] = self.call_score(score_name)
+        
+        # Append each already-calculated score to a dataframe
+        df.append(self.scores)
+        df = pd.DataFrame(df)
+        return df
     
 
     # Traditional measures :

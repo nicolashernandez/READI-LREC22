@@ -111,7 +111,7 @@ def average_cosine_similarity_tfidf(text, nlp = None, mode="text"):
         def spacy_filter(doc, nlp):
             return [token.lemma_ for token in nlp(doc) if (token.pos_ in spacy_pronoun_tags) or (token.pos_ == "PROPN") or (token.pos_ == "NOUN")]
     else:
-        raise TypeError("Type of parameter 'mode' cannot be '", type(mode),"', needs to be 'text', 'lemma', 'subgroup_text', 'subgroup_lemma'")
+        raise TypeError("Type of parameter 'mode' cannot be '", mode,"', needs to be 'text', 'lemma', 'subgroup_text', 'subgroup_lemma'")
     
     for sentence_tokens in sentences:
         doc = ' '.join(sentence_tokens)

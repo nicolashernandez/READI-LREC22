@@ -73,20 +73,6 @@ class ParsedText:
     def show_text(self):
         return utils.convert_text_to_string(self.content)
 
-    def show_scores(self,force=False):
-        df = []
-        if force:
-            for score_name in list(self.scores.keys()):
-                if self.scores[score_name] is None:
-                    # Check if score can be calculated, and if its dependencies are available.
-                    if self.readability_processor.check_score_and_dependencies_available(score_name):
-                        self.scores[score_name] = self.readability_processor.informations[score_name]["function"](self.content)
-        
-        # Append each already-calculated score to a dataframe
-        df.append(self.scores)
-        df = pd.DataFrame(df)
-        return df
-
     def show_statistics(self):
         """
         Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.
@@ -96,25 +82,31 @@ class ParsedText:
             print(stat, "=", self.statistics[stat])
         return self.statistics
 
-    # NOTE : Explicitely naming each of the functions but probably exists a better way to set certain function names from the ReadabilityProcessor instance
-    # Directly calling them from self.readability_processor.information[value][function] could be possible
-    # The only problem is that some of them take different number of arguments, or different types of arguments, so i'll just explicitly
-    # put them here just in case.
-    # I suppose I could make a call_function(func_args) subroutine, but I wonder what happens if func_args is empty
-    # Does *(func_args) result in nothing, or is an empty argument added?
-    def stub_call_score(self,score_name):
+    def call_score(self,score_name):
         # check if score_name already in scores:
         if self.scores[score_name] is not None:
             return self.scores[score_name]
         # otherwise check if score_name is available in processor:
         elif self.readability_processor.check_score_and_dependencies_available(score_name):
-            # If so, then call function : func = readability_processor.informations[score_name][function]
+            # If so, then call function based on informations
             func = self.readability_processor.informations[score_name]["function"]
-            # func_default_args = something #probably can add them to readability_processor.informations[score_name]["default_arguments"].
-            func_default_args = "unknown"
-            # return func(self.content, func_default_args)
-            print("function detected: ",func)
-        return 0
+            default_args = self.readability_processor.informations[score_name]["default_arguments"].values()
+            self.scores[score_name] = func(self.content, *(default_args))
+            return self.scores[score_name]
+        # If function is unavailable, return None to indicate so.
+        return None
+
+    def show_scores(self,force=False):
+        df = []
+        if force:
+            for score_name in list(self.scores.keys()):
+                self.scores[score_name] = self.call_score(score_name)
+        
+        # Append each already-calculated score to a dataframe
+        df.append(self.scores)
+        df = pd.DataFrame(df)
+        return df
+
     
 
     # Traditional measures

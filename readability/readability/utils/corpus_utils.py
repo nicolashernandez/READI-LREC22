@@ -1,61 +1,5 @@
 #TODO : Repurpose these to be used on a list of texts (no notion of class)
 
-# Utility functions that I don't think I can put in utils
-def do_function_with_default_arguments(self,score_type):
-    """Utility function that calls one of the function listed in self.score_types with default arguments"""
-    if score_type in self.score_types["no_argument_needed"].keys():
-        func = self.score_types["no_argument_needed"][score_type]
-        print("WARNING: Score type '",score_type,"' not found in current instance, now using function ",func.__name__, " with default parameters",sep="")
-        return func()
-    elif score_type in self.score_types["argument_needed"].keys():
-        func =  self.score_types["argument_needed"][score_type]
-        print("WARNING: Score type '",score_type,"' not found in current instance, now using function ",func.__name__, " with default parameters",sep="")
-        return func(score_type)
-
-def get_corpus_scores(self, score_type=None, scores=None):
-    """
-    Utility function that searches relevant scores if a valid score_type that belongs to self.score_types is specified.
-    If no scores can be recovered, this function will attempt to call the corresponding function with default arguments.
-
-    :return: a dictionary, assigning a value to each text of each specified class of a corpus.
-    :rtype: dict[str][str][str][str]
-    """
-    # There are 5 cases:
-    # score_type is unknown : error
-    # score_type is known,scores are known : do the actual function
-    # score_type is known, scores are unknown, but stored inside corpus.stats : extract them then do actual function
-    # score_type is known, scores are unkown, can't be found inside corpus_stats : get them w/ default then do actual function
-    # score_type is known, scores are unknown, and not stored : get them w/ default param then do actual function
-
-    if self.content_type == "text":
-        raise TypeError('Content type is not corpus, please load something else to use this function.')
-    if score_type not in list(self.score_types['no_argument_needed'].keys()) + list(self.score_types['argument_needed'].keys()):
-        raise RuntimeError("the score type '", score_type ,"' is not recognized by the current Readability object, please pick one from", list(self.score_types['no_argument_needed'].keys()) + list(self.score_types['argument_needed'].keys()))
-    if score_type is not None:
-        if not hasattr(self,"corpus_statistics"):
-            print("Suggestion : Use Readability.compile() beforehand to allow the Readability object to store information when using other methods.")
-            if scores is not None:
-                # Case : user provides scores even though .compile() was never used, trust these scores and perform next function.
-                print("Now using user-provided scores from 'scores' argument")
-                pass
-            else:
-                # Case : user provides no scores and cannot refer to self to find the scores, so use corresponding function with default parameters.
-                scores = self.do_function_with_default_arguments(score_type)
-
-        elif not hasattr(self.corpus_statistics[self.classes[0]][0],score_type):
-            # Case : self.corpus_statistics exists, but scores aren't found when referring to self, so using corresponding function with default parameters.
-            scores = self.do_function_with_default_arguments(score_type)
-        else:
-            # Case : scores found via referring to self.corpus_statistics, so just extract them.
-            scores = {}
-            for level in self.classes:
-                scores[level] = []
-                for score_dict in self.corpus_statistics[level]:
-                    scores[level].append(score_dict.__dict__[score_type])
-
-        return scores
-
-
 def remove_outliers(self, stddevratio=1, score_type=None, scores=None):
     """
     Outputs a corpus, after removing texts which are considered to be "outliers", based on a standard deviation ratio
@@ -97,35 +41,6 @@ def remove_outliers(self, stddevratio=1, score_type=None, scores=None):
         print("New number of texts for class", level, ":", len(corpus_no_outliers[level]))
     print("In order to use this new corpus, you'll have to make a new Readability instance.")
     return corpus_no_outliers
-
-
-def stub_generalize_get_score(self, func, func_args , score_name):
-    """
-    Stub for functions that do the same logic when calculating a score and then potentially assign it to .corpus_statistics or else
-
-    func is just a reference to the function
-    func_args is a tuple  with the needed arguments for a text.
-    score_name is the name of the score to assign to .corpus_statistics in order to re-use it in other methods.
-    """
-    if self.content_type == "text":
-        print(func_args)
-        print(*(func_args))
-        return func(self.content, *(func_args))
-    elif self.content_type == "corpus":
-        scores = {}
-        for level in self.classes:
-            temp_score = 0
-            scores[level] = []
-            for index,text in enumerate(self.content[level]):
-                scores[level].append(func(text, *(func_args)))
-                temp_score += scores[level][index]
-                if hasattr(self, "corpus_statistics"):
-                    setattr(self.corpus_statistics[level][index],score_name,scores[level][index])
-            temp_score = temp_score / len(scores[level])
-            print("class", level, "mean score :" ,temp_score)
-        return scores
-    else:
-        return -1
 
 # NOTE: Maybe this should go in the stats subfolder to have less bloat.
 def corpus_info(self):
