@@ -82,32 +82,33 @@ class ParsedText:
             print(stat, "=", self.statistics[stat])
         return self.statistics
 
-    def call_score(self,score_name):
+    #idea, if providing args... args are provided. what a concept I know
+    #presume args is a tuple since that's how we'll handle it.
+    def call_score(self, score_name, arguments=None, force=False):
         # check if score_name already in scores:
-        if self.scores[score_name] is not None:
+        if self.scores[score_name] is not None and not force:
             return self.scores[score_name]
         # otherwise check if score_name is available in processor:
         elif self.readability_processor.check_score_and_dependencies_available(score_name):
             # If so, then call function based on informations
             func = self.readability_processor.informations[score_name]["function"]
-            default_args = self.readability_processor.informations[score_name]["default_arguments"].values()
-            self.scores[score_name] = func(self.content, *(default_args))
+            if arguments is None:
+                arguments = self.readability_processor.informations[score_name]["default_arguments"].values()
+            self.scores[score_name] = func(self.content, *(arguments))
             return self.scores[score_name]
         # If function is unavailable, return None to indicate so.
-        return None
+        else:
+            return None
 
     def show_scores(self,force=False):
         df = []
         if force:
             for score_name in list(self.scores.keys()):
-                self.scores[score_name] = self.call_score(score_name)
-        
+                self.scores[score_name] = self.call_score(score_name,force=True)
         # Append each already-calculated score to a dataframe
         df.append(self.scores)
         df = pd.DataFrame(df)
         return df
-
-    
 
     # Traditional measures
     def traditional_score(self,score_name):
@@ -154,9 +155,7 @@ class ParsedText:
 
     # Measures related to text diversity
     def diversity(self, ratio_type, formula_type=None, force=False):
-        if self.scores[ratio_type] == None or force:
-            self.scores[ratio_type] = self.readability_processor.diversity(self.content,ratio_type,formula_type)
-        return self.scores[ratio_type]
+        return self.call_score(ratio_type,[formula_type],force)
 
     def ttr(self, formula_type=None, force=False):
         """Returns Text Token Ratio: number of unique words / number of words"""
