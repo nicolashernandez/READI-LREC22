@@ -211,13 +211,13 @@ class ParsedText:
             self.statistics["nb_proper_nouns"] = self.readability_processor.count_proper_nouns(self.content,mode)
         return self.statistics["nb_proper_nouns"]
 
-    def lexical_cohesion_tfidf(self,mode="text"):
-        if self.scores["cosine_similarity_tfidf"] == None:
+    def lexical_cohesion_tfidf(self, mode="text", force=False):
+        if self.scores["cosine_similarity_tfidf"] == None or force:
             self.scores["cosine_similarity_tfidf"] = self.readability_processor.lexical_cohesion_tfidf(self.content,mode)
         return self.scores["cosine_similarity_tfidf"]
 
     # NOTE: this seems to output the same values, whether we use text or lemmas, probably due to the type of model used.
-    def lexical_cohesion_LDA(self,mode="text"):
-        if self.scores["cosine_similarity_LDA"] == None:
+    def lexical_cohesion_LDA(self ,mode="text", force=False):
+        if self.scores["cosine_similarity_LDA"] == None or force:
             self.scores["cosine_similarity_LDA"] = self.readability_processor.lexical_cohesion_LDA(self.content,mode)
         return self.scores["cosine_similarity_LDA"]

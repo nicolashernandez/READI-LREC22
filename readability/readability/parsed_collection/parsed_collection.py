@@ -230,37 +230,53 @@ class ParsedCollection:
         return moy_score
 
     # NOTE : might do these 3 at start-up instead.
-    def count_pronouns(self,mode="text"):
-        if "nb_pronouns" in list(self.statistics.keys()):
-            if self.statistics["nb_pronouns"] == None:
-                self.statistics["nb_pronouns"] = self.readability_processor.count_pronouns(self.content,mode)
-        else: 
-            self.statistics["nb_pronouns"] = self.readability_processor.count_pronouns(self.content,mode)
-        return self.statistics["nb_pronouns"]
+    #def count_pronouns(self,mode="text"):
+    #    if "nb_pronouns" in list(self.statistics.keys()):
+    #        if self.statistics["nb_pronouns"] == None:
+    #            self.statistics["nb_pronouns"] = self.readability_processor.count_pronouns(self.content,mode)
+    #    else: 
+    #        self.statistics["nb_pronouns"] = self.readability_processor.count_pronouns(self.content,mode)
+    #    return self.statistics["nb_pronouns"]
     
-    def count_articles(self,mode="text"):
-        if "nb_articles" in list(self.statistics.keys()):
-            if self.statistics["nb_articles"] == None:
-                self.statistics["nb_articles"] = self.readability_processor.count_articles(self.content,mode)
-        else: 
-            self.statistics["nb_articles"] = self.readability_processor.count_articles(self.content,mode)
-        return self.statistics["nb_articles"]
+    #def count_articles(self,mode="text"):
+    #    if "nb_articles" in list(self.statistics.keys()):
+    #        if self.statistics["nb_articles"] == None:
+    #            self.statistics["nb_articles"] = self.readability_processor.count_articles(self.content,mode)
+    #    else: 
+    #        self.statistics["nb_articles"] = self.readability_processor.count_articles(self.content,mode)
+    #    return self.statistics["nb_articles"]
         
-    def count_proper_nouns(self,mode="text"):
-        if "nb_proper_nouns" in list(self.statistics.keys()):
-            if self.statistics["nb_proper_nouns"] == None:
-                self.statistics["nb_proper_nouns"] = self.readability_processor.count_proper_nouns(self.content,mode)
-        else: 
-            self.statistics["nb_proper_nouns"] = self.readability_processor.count_proper_nouns(self.content,mode)
-        return self.statistics["nb_proper_nouns"]
+    #def count_proper_nouns(self,mode="text"):
+    #    if "nb_proper_nouns" in list(self.statistics.keys()):
+    #        if self.statistics["nb_proper_nouns"] == None:
+    #            self.statistics["nb_proper_nouns"] = self.readability_processor.count_proper_nouns(self.content,mode)
+    #    else: 
+    #        self.statistics["nb_proper_nouns"] = self.readability_processor.count_proper_nouns(self.content,mode)
+    #    return self.statistics["nb_proper_nouns"]
 
-    def lexical_cohesion_tfidf(self,mode="text"):
-        if self.scores["cosine_similarity_tfidf"] == None:
-            self.scores["cosine_similarity_tfidf"] = self.readability_processor.lexical_cohesion_tfidf(self.content,mode)
-        return self.scores["cosine_similarity_tfidf"]
+    def lexical_cohesion_tfidf(self, mode="text", force=False):
+        moy_score = dict()
+        for label in list(self.content.keys()):
+            if self.scores["cosine_similarity_tfidf"][label] == None or force:
+                moy = 0
+                for text in self.content[label]:
+                    moy += text.lexical_cohesion_tfidf(mode, force)
+                self.scores["cosine_similarity_tfidf"][label] = moy / len(self.content[label])
+                moy_score[label] = self.scores["cosine_similarity_tfidf"][label]
+            else:
+                moy_score[label] = self.scores["cosine_similarity_tfidf"][label]
+        return moy_score
 
     # NOTE: this seems to output the same values, whether we use text or lemmas, probably due to the type of model used.
-    def lexical_cohesion_LDA(self,mode="text"):
-        if self.scores["cosine_similarity_LDA"] == None:
-            self.scores["cosine_similarity_LDA"] = self.readability_processor.lexical_cohesion_LDA(self.content,mode)
-        return self.scores["cosine_similarity_LDA"]
+    def lexical_cohesion_LDA(self, mode="text", force=False):
+        moy_score = dict()
+        for label in list(self.content.keys()):
+            if self.scores["cosine_similarity_LDA"][label] == None or force:
+                moy = 0
+                for text in self.content[label]:
+                    moy += text.lexical_cohesion_LDA(mode, force)
+                self.scores["cosine_similarity_LDA"][label] = moy / len(self.content[label])
+                moy_score[label] = self.scores["cosine_similarity_LDA"][label]
+            else:
+                moy_score[label] = self.scores["cosine_similarity_LDA"][label]
+        return moy_score
