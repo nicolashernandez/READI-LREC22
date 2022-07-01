@@ -17,6 +17,7 @@ from .stats import diversity, perplexity, common_scores, word_list_based, syntac
 from .methods import methods
 from .models import bert, fasttext, models
 from .parsed_text import parsed_text
+from .parsed_collection import parsed_collection
 
 # Checklist :
 #     Remake structure to help differenciate between functions : ~ I think it's okay but I need some feedback

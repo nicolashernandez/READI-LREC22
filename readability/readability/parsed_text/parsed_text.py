@@ -4,7 +4,6 @@ The ParsedText class serves as an interface between a text and a readability_pro
 It is meant to be created as a result of readability_processor.parse() since it uses the processor in order to know which measures are available, and
 have access to the resources necessary to calculate them.
 """
-from cmath import nan
 import copy
 import math
 
@@ -75,7 +74,6 @@ class ParsedText:
         return utils.convert_text_to_string(self.content)
 
     def show_scores(self,force=False):
-        # TODO : Create a dataframe, append each already-calculated score
         df = []
         if force:
             for score_name in list(self.scores.keys()):
@@ -84,21 +82,10 @@ class ParsedText:
                     if self.readability_processor.check_score_and_dependencies_available(score_name):
                         self.scores[score_name] = self.readability_processor.informations[score_name]["function"](self.content)
         
+        # Append each already-calculated score to a dataframe
         df.append(self.scores)
         df = pd.DataFrame(df)
         return df
-        
-        # Otherwise for force=false append each remaining score but add NaN or NaN
-
-        # Then if force=True => for every non-calculated score =>
-        #   Check if score appears in .readability_processor.informations:
-        #       Calculate that score and append to dataframe
-        #       Else put NA or NaN
-        
-        # Then sort dataframe by name?
-        #math_formulas = pd.DataFrame([moy_GFI,moy_ARI,moy_FRE,moy_FKGL,moy_SMOG,moy_REL],columns=levels)
-        # No need to store the dataframe since checking if scores appear in dict should take a miniscule amount of time
-        return -1
 
     def show_statistics(self):
         """
@@ -114,7 +101,7 @@ class ParsedText:
     # The only problem is that some of them take different number of arguments, or different types of arguments, so i'll just explicitly
     # put them here just in case.
     # I suppose I could make a call_function(func_args) subroutine, but I wonder what happens if func_args is empty
-    # Does doing *(func_args) result in nothing, or is an empty argument added?
+    # Does *(func_args) result in nothing, or is an empty argument added?
     def stub_call_score(self,score_name):
         # check if score_name already in scores:
         if self.scores[score_name] is not None:
