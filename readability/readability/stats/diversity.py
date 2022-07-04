@@ -31,7 +31,7 @@ def type_token_ratio(text, nlp = None, mode = None):
     #Maybe warn the user and send an unusable ratio, such as two? I suppose. 
 
     if nb_tokens == 0:
-        print("WARNING : Current text's content is empty, returned ratio value has been set to 0")
+        print("WARNING: Current text's content is empty, returned type_token_ratio value has been set to 0")
         return 0
 
     if mode == "corrected":
@@ -67,7 +67,7 @@ def noun_token_ratio(text, nlp = None, mode = None):
     nb_tokens = len(nouns)
 
     if nb_tokens == 0:
-        print("WARNING : Current text's content is empty or no nouns have been recognized, returned ratio value has been set to 0")
+        print("WARNING: Current text's content is empty or no nouns have been recognized, returned noun_token_ratio value has been set to 0")
         return 0
 
     if mode == "corrected":

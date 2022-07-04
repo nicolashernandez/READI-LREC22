@@ -16,7 +16,7 @@ class ParsedCollection:
 
     Might be created as a result of ReadabilityProcessor.parseCollection(), or might be instantiated on its own. Not sure for now.
     """
-    def __init__(self, list_of_texts, readability_processor):
+    def __init__(self, text_collection, readability_processor):
         """
         Constructor of the ParsedCollection class, creates the following attributes:
         self.readability_processor, self.content, self.scores, self.statistics
@@ -24,16 +24,7 @@ class ParsedCollection:
         We're supposing that texts are already in ParsedText(format).
         """
         self.readability_processor = readability_processor
-
-        # TODO: Placeholder creation of self.content, create a function that converts different types of (labels, texts) collections into the same structure
-        # Also, if using a list of texts, make a dict(default = list_of_texts) for compatibility, we'll suppose every text has the same label.
-        if isinstance(list_of_texts, str):
-            raise TypeError("Input type is 'str', please provide a dict() or a list(list()) instead")
-        # Recognising a list of lists, weird but ok.
-        if any(isinstance(el, list) for el in list_of_texts):
-            print("should be list of lists, can do something to convert there")
-            print("just assign a label 1,2,3,4,5 to each label or something, doesn't really matter, but warn user.")
-        self.content = dict(default = list_of_texts)
+        self.content = text_collection
 
         # Initialize scores by setting them all to None
         self.scores = dict()
@@ -72,9 +63,105 @@ class ParsedCollection:
         In this case, this will output the mean values of each score for each class.
         """
         for label in list(self.content.keys()):
+            print(label + "------------------")
             for stat in list(self.statistics[label].keys()):
                 print(stat, "=", self.statistics[label][stat])
-        #TODO : re-use corpus.info() from utils/corpus_utils to show more stuff
+        #corpus = self.content
+        #levels = self.content.keys()
+        cols = list(self.content.keys()) + ['total']
+
+    def corpus_info(self):
+        """
+        Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.
+        In this case, this will output the mean values of each score for each class.
+        """
+        # TODO: Rewrite this to exploit self.statistics and be more legible.
+
+        # Build vocabulary. NOTE: maybe do that at init
+        vocab = dict()
+        for level in self.content.keys():
+            vocab[level] = list()
+            for text in self.content[level]:
+                unique = set()
+                for sent in text.content:
+                    #for sent in text['content']:
+                    for token in sent:
+                        unique.add(token)
+                vocab[level].append(unique)
+        # Number of texts, sentences, and tokens per level, and on the entire corpus
+        nb_ph_moy= list()
+        nb_ph = list()
+        nb_files = list()
+        nb_tokens = list()
+        nb_tokens_moy = list()
+        len_ph_moy = list()
+
+        for level in list(self.content.keys()):
+            nb_txt = len(self.content[level])
+            nb_files.append(nb_txt)
+            nbr_ph=0
+            nbr_ph_moy=0
+            nbr_tokens=0
+            nbr_tokens_moy=0
+            len_phr=0
+            len_phr_moy=0
+            for text in self.content[level]:
+                nbr_ph+=len(text.content)
+                temp_nbr_ph = min(len(text.content),1) # NOTE : not sure this is a good idea.
+                nbr_ph_moy+=len(text.content)/nb_txt
+                for sent in text.content:
+                    nbr_tokens+=len(sent)
+                    nbr_tokens_moy+= len(sent)/nb_txt
+                    len_phr+=len(sent)
+                len_phr_moy+=len_phr/temp_nbr_ph
+                len_phr=0
+            len_phr_moy = len_phr_moy/nb_txt
+            nb_tokens.append(nbr_tokens)
+            nb_tokens_moy.append(nbr_tokens_moy)
+            nb_ph.append(nbr_ph)
+            nb_ph_moy.append(nbr_ph_moy)
+            len_ph_moy.append(len_phr_moy)
+        nb_files_tot = sum(nb_files)
+        nb_ph_tot = sum(nb_ph)
+        nb_tokens_tot = sum(nb_tokens)
+        nb_tokens_moy_tot = nb_tokens_tot/nb_files_tot
+        nb_ph_moy_tot = nb_ph_tot/nb_files_tot
+        len_ph_moy_tot = sum(len_ph_moy)/len(list(self.content.keys()))
+        nb_files.append(nb_files_tot)
+        nb_ph.append(nb_ph_tot)
+        nb_tokens.append(nb_tokens_tot)
+        nb_tokens_moy.append(nb_tokens_moy_tot)
+        nb_ph_moy.append(nb_ph_moy_tot)
+        len_ph_moy.append(len_ph_moy_tot)
+
+        # Vocabulary size per class
+        taille_vocab =list()
+        taille_vocab_moy=list()
+        all_vocab =set()
+        for level in list(self.content.keys()):
+            vocab_level = set()
+            for text in vocab[level]:
+                for token in text:
+                    all_vocab.add(token)
+                    vocab_level.add(token)
+            taille_vocab.append(len(vocab_level))
+
+        taille_vocab.append(len(all_vocab))
+
+        # Mean size of vocabulary
+        taille_vocab_moy = list()
+        taille_moy_total = 0
+        for level in list(self.content.keys()):
+            moy=0
+            for text in vocab[level]:
+                taille_moy_total+= len(text)/nb_files_tot
+                moy+=len(text)/len(vocab[level])
+            taille_vocab_moy.append(moy)
+        taille_vocab_moy.append(taille_moy_total)  
+            
+        df = pd.DataFrame([nb_files,nb_ph,nb_ph_moy,len_ph_moy,nb_tokens,nb_tokens_moy,taille_vocab,taille_vocab_moy],columns=cols)
+        df.index = ["Nombre de fichiers","Nombre de phrases total","Nombre de phrases moyen","Longueur moyenne de phrase","Nombre de tokens", "Nombre de token moyen","Taille du vocabulaire", "Taille moyenne du vocabulaire"]
+        return round(df,0)
 
     def call_score(self,score_name):
         moy_score = dict()

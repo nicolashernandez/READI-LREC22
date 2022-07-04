@@ -70,7 +70,7 @@ def corpus_info(self):
                     #for sent in text['content']:
                     for token in sent:
                         unique.add(token)
-                    vocab[level].append(unique)
+                vocab[level].append(unique)
         
         # Number of texts, sentences, and tokens per level, and on the entire corpus
         nb_ph_moy= list()

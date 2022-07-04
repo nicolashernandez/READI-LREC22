@@ -157,36 +157,38 @@ class Readability:
         return parsed_text.ParsedText(text,self)
     
     def parseCollection(self,collection):
-        """aaa"""
+        """
+        Creates a ParsedCollection instance that relies on the ReadabilityProcessor in order to output various readability measures.
+        Currently, only three types of structures are accepted:
+        A corpus-like dictionary that associates labels with texts. e.g : dict(class_1:{text1,text2},class_2:{text1,text2}).
+        A list of lists of texts. Will be given labels for compatibility with other functions.
+        A singular list of texts. Will be given a label for compatibility with other functions.
+        """
         # Structure is dictionary, try to adapt the structure to be : dict(class_1:{text1,text2},class_2{text1,text2}..)
         if isinstance(collection,dict):
-            # TODO: try to adapt dict to follow structure
-            # TODO: also parse each text.
-            print("case dict")
-            return collection
-            #return parsed_collection.ParsedCollection(collection, self)
-
-
-        # Structure type is list, supposing that each initial index corresponds to a text.
-        # TODO: need to differentiate between list(text) and list(list(text)) somehow..
+            return parsed_collection.ParsedCollection(collection, self)
         elif isinstance(collection, list):
-            #Try catch utils.conver_text_to_string(collection[0])
             try:
                 # Check if collection contains a list of texts or a list of lists of texts
                 # This raises an exception if not applied on a text.
                 utils.convert_text_to_string(collection[0])
             except Exception:
                 # Case with multiple lists of texts:
-                print("multi list")
-                print("does this break")
-                return "not_implemented_yet"
+                counter = 0
+                copy_collection = dict()
+                for text_list in collection:
+                    copy_list = []
+                    for text in text_list:
+                        copy_list.append(self.parse(text))
+                    copy_collection["label" + str(counter)] = copy_list
+                    counter +=1
+                return parsed_collection.ParsedCollection(copy_collection,self)
             else:
                 # Case with one list of texts:
-                print("do the thing")
                 copy_collection = []
                 for text in collection:
                     copy_collection.append(self.parse(text))
-                copy_collection = dict(default_label = copy_collection)    
+                copy_collection = dict(label0 = copy_collection)
                 return parsed_collection.ParsedCollection(copy_collection, self)
 
         else:

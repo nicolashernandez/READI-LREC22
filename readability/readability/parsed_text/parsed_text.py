@@ -101,7 +101,7 @@ class ParsedText:
             func = self.readability_processor.informations[score_name]["function"]
             if arguments is None:
                 arguments = self.readability_processor.informations[score_name]["default_arguments"].values()
-                #print("WARNING : defaulting to default arguments :", arguments)
+                #print("WARNING: defaulting to default arguments :", arguments)
 
             self.scores[score_name] = func(self.content, *(arguments))
             return self.scores[score_name]
