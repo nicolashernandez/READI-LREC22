@@ -166,7 +166,13 @@ class Readability:
         """
         # Structure is dictionary, try to adapt the structure to be : dict(class_1:{text1,text2},class_2{text1,text2}..)
         if isinstance(collection,dict):
-            return parsed_collection.ParsedCollection(collection, self)
+            copy_collection = dict()
+            for label,text_list in collection.items():
+                copy_list = []
+                for text in text_list:
+                    copy_list.append(self.parse(text))
+                copy_collection[label] = copy_list
+            return parsed_collection.ParsedCollection(copy_collection, self)
         elif isinstance(collection, list):
             try:
                 # Check if collection contains a list of texts or a list of lists of texts

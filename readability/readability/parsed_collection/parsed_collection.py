@@ -38,6 +38,7 @@ class ParsedCollection:
                 self.scores[info][label] = None
         
 
+        #First off, need to redo this, what's the point of exploiting parsedtext huh
         self.statistics = dict()
         for label in list(self.content.keys()):
             self.statistics[label] = dict()
@@ -47,15 +48,18 @@ class ParsedCollection:
             self.statistics[label]["totalCharacters"] = 0
             self.statistics[label]["totalSyllables"] = 0
             self.statistics[label]["nbPolysyllables"] = 0
+            
+                
             for text in self.content[label]:
-                self.statistics[label]["totalSentences"] += len(text.content)
-                for sentence in text.content:
-                    self.statistics[label]["totalWords"] += len(sentence)
-                    self.statistics[label]["totalLongWords"] += len([token for token in sentence if len(token)>6])
-                    self.statistics[label]["totalCharacters"] += sum(len(token) for token in sentence)
-                    self.statistics[label]["totalSyllables"] += sum(utils.syllablesplit(word) for word in sentence)
-                    self.statistics[label]["nbPolysyllables"] += sum(utils.syllablesplit(word) for word in sentence if utils.syllablesplit(word)>=3)
-                    #self.statistics["nbPolysyllables"] += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
+                for stat in list(self.statistics[label].keys()):
+                    self.statistics[label][stat] += text.statistics[stat]
+            self.statistics[label]["vocabulary"] = set()
+            for text in self.content[label]:
+                self.statistics[label]["vocabulary"] = self.statistics[label]["vocabulary"].union(text.statistics["vocabulary"])
+            self.statistics[label]["totalTexts"] = len(self.content[label])
+            self.statistics[label]["meanSentences"] = round(self.statistics[label]["totalSentences"] / len(self.content[label]),1)
+            self.statistics[label]["meanTokens"] = round(self.statistics[label]["totalWords"] / len(self.content[label]),1)
+
     
     def show_statistics(self):
         """
@@ -65,10 +69,10 @@ class ParsedCollection:
         for label in list(self.content.keys()):
             print(label + "------------------")
             for stat in list(self.statistics[label].keys()):
-                print(stat, "=", self.statistics[label][stat])
-        #corpus = self.content
-        #levels = self.content.keys()
-        cols = list(self.content.keys()) + ['total']
+                if stat == "vocabulary":
+                    print(stat, "=", len(self.statistics[label][stat]), "words")
+                else:
+                    print(stat, "=", self.statistics[label][stat])
 
     def corpus_info(self):
         """
@@ -88,51 +92,7 @@ class ParsedCollection:
                     for token in sent:
                         unique.add(token)
                 vocab[level].append(unique)
-        # Number of texts, sentences, and tokens per level, and on the entire corpus
-        nb_ph_moy= list()
-        nb_ph = list()
-        nb_files = list()
-        nb_tokens = list()
-        nb_tokens_moy = list()
-        len_ph_moy = list()
 
-        for level in list(self.content.keys()):
-            nb_txt = len(self.content[level])
-            nb_files.append(nb_txt)
-            nbr_ph=0
-            nbr_ph_moy=0
-            nbr_tokens=0
-            nbr_tokens_moy=0
-            len_phr=0
-            len_phr_moy=0
-            for text in self.content[level]:
-                nbr_ph+=len(text.content)
-                temp_nbr_ph = min(len(text.content),1) # NOTE : not sure this is a good idea.
-                nbr_ph_moy+=len(text.content)/nb_txt
-                for sent in text.content:
-                    nbr_tokens+=len(sent)
-                    nbr_tokens_moy+= len(sent)/nb_txt
-                    len_phr+=len(sent)
-                len_phr_moy+=len_phr/temp_nbr_ph
-                len_phr=0
-            len_phr_moy = len_phr_moy/nb_txt
-            nb_tokens.append(nbr_tokens)
-            nb_tokens_moy.append(nbr_tokens_moy)
-            nb_ph.append(nbr_ph)
-            nb_ph_moy.append(nbr_ph_moy)
-            len_ph_moy.append(len_phr_moy)
-        nb_files_tot = sum(nb_files)
-        nb_ph_tot = sum(nb_ph)
-        nb_tokens_tot = sum(nb_tokens)
-        nb_tokens_moy_tot = nb_tokens_tot/nb_files_tot
-        nb_ph_moy_tot = nb_ph_tot/nb_files_tot
-        len_ph_moy_tot = sum(len_ph_moy)/len(list(self.content.keys()))
-        nb_files.append(nb_files_tot)
-        nb_ph.append(nb_ph_tot)
-        nb_tokens.append(nb_tokens_tot)
-        nb_tokens_moy.append(nb_tokens_moy_tot)
-        nb_ph_moy.append(nb_ph_moy_tot)
-        len_ph_moy.append(len_ph_moy_tot)
 
         # Vocabulary size per class
         taille_vocab =list()
@@ -154,27 +114,35 @@ class ParsedCollection:
         for level in list(self.content.keys()):
             moy=0
             for text in vocab[level]:
-                taille_moy_total+= len(text)/nb_files_tot
+                taille_moy_total+= len(text)/self.statistics[level]["totalTexts"]
                 moy+=len(text)/len(vocab[level])
             taille_vocab_moy.append(moy)
-        taille_vocab_moy.append(taille_moy_total)  
-            
-        df = pd.DataFrame([nb_files,nb_ph,nb_ph_moy,len_ph_moy,nb_tokens,nb_tokens_moy,taille_vocab,taille_vocab_moy],columns=cols)
-        df.index = ["Nombre de fichiers","Nombre de phrases total","Nombre de phrases moyen","Longueur moyenne de phrase","Nombre de tokens", "Nombre de token moyen","Taille du vocabulaire", "Taille moyenne du vocabulaire"]
-        return round(df,0)
+        taille_vocab_moy.append(taille_moy_total)
 
-    def call_score(self,score_name):
+        return vocab
+
+
+    def call_score(self,score_name, arguments=None, force=False):
+        """
+        Helper function that gets a score if it already exists, otherwise checks if it's available, if so call the relevant function from the ReadabilityProcessor
+        Use of function is : instance.call_score("score_name", arguments:[arg1,arg2,argi..], force:bool)
+        If the underlying function needs no additional arguments, just pass en empty list, e.g : instance.call_score("pppl",[],True)
+
+        :param str score_name: Name of a score recognized by ReadabilityProcessor.informations.
+        :param list(any) arguments: Values used to change behavior of underlying functions.
+        :param bool force: Indicates whether to force the calculation of a score or not.
+        """
         moy_score = dict()
         # Check if measure already calculated
         for label in list(self.content.keys()):
             # If so, then just get it
-            if self.scores[score_name][label] is not None:
+            if self.scores[score_name][label] is not None and not force:
                 moy_score[label] = self.scores[score_name][label]
             elif self.readability_processor.check_score_and_dependencies_available(score_name):
                 #Otherwise, get it if ParsedText items already calculated it, or get them to calculate it.
                 moy = 0
                 for text in self.content[label]:
-                    moy += text.call_score(score_name)
+                    moy += text.call_score(score_name, arguments, force)
                 self.scores[score_name][label] = moy / len(self.content[label])
                 moy_score[label] = self.scores[score_name][label]
             else:
@@ -185,7 +153,7 @@ class ParsedCollection:
         df = []
         if force:
             for score_name in list(self.scores.keys()):
-                self.scores[score_name] = self.call_score(score_name)
+                self.scores[score_name] = self.call_score(score_name, force=True)
         
         # Append each already-calculated score to a dataframe
         df.append(self.scores)
@@ -195,6 +163,9 @@ class ParsedCollection:
 
     # Traditional measures :
     def traditional_score(self,score_name):
+        # NOTE: don't use self.call_score for this one, the reference to ParsedText.call_score prevents using ParsedText.statistics as a speed-up.
+        # Since the functions share the same name, there probably exists a way to "access" the .traditional_score() method of ParsedText instead of
+        # knowning how to get ReadabilityProcessor.score(), which is less useful.
         moy_score = dict()
         # Check if scores exist, otherwise calculate 
         for label in list(self.content.keys()):
@@ -238,47 +209,16 @@ class ParsedCollection:
 
 
     # Measures related to perplexity
-    def perplexity(self):
-        moy_score = dict()
-        for label in list(self.content.keys()):
-            if self.scores["pppl"][label] == None:
-                print("Now calculating perplexity for class:",label)
-                moy = 0
-                for text in self.content[label]:
-                    moy += text.perplexity()
-                self.scores["pppl"][label] = moy / len(self.content[label])
-                moy_score[label] = self.scores["pppl"][label]
-            else:
-                moy_score[label] = self.scores["pppl"][label]
-        return moy_score
+    def perplexity(self,force=False):
+        return self.call_score("pppl",[], force)
     
-    def stub_rsrs(self):
-        moy_score = dict()
-        for label in list(self.content.keys()):
-            if self.scores["rsrs"][label] == None:
-                moy = 0
-                for text in self.content[label]:
-                    moy += text.stub_rsrs()
-                self.scores["rsrs"][label] = moy / len(self.content[label])
-                moy_score[label] = self.scores["rsrs"][label]
-            else:
-                moy_score[label] = self.scores["rsrs"][label]
-        return moy_score
+    def stub_rsrs(self,force=False):
+        return self.call_score("rsrs",[], force)
 
 
     # Measures related to text diversity
     def diversity(self, ratio_type, formula_type=None, force=False):
-        moy_score = dict()
-        for label in list(self.content.keys()):
-            if self.scores[ratio_type][label] == None or force:
-                moy = 0
-                for text in self.content[label]:
-                    moy += text.diversity(ratio_type,formula_type,force)
-                self.scores[ratio_type][label] = moy / len(self.content[label])
-                moy_score[label] = self.scores[ratio_type][label]
-            else:
-                moy_score[label] = self.scores[ratio_type][label]
-        return moy_score
+        return self.call_score(ratio_type,[formula_type],force)
 
     def ttr(self, formula_type=None, force=False):
         """Returns Text Token Ratio: number of unique words / number of words"""
@@ -291,31 +231,18 @@ class ParsedCollection:
 
     # Measures based on pre-existing word lists
     def dubois_proportion(self,filter_type="total",filter_value=None, force=False):
-        moy_score = dict()
-        for label in list(self.content.keys()):
-            if self.scores["dubois_buyse_ratio"][label] == None or force:
-                moy = 0
-                for text in self.content[label]:
-                    moy += text.dubois_proportion(filter_type,filter_value,force)
-                self.scores["dubois_buyse_ratio"][label] = moy / len(self.content[label])
-                moy_score[label] = self.scores["dubois_buyse_ratio"][label]
-            else:
-                moy_score[label] = self.scores["dubois_buyse_ratio"][label]
-        return moy_score
+        return self.call_score("dubois_buyse_ratio",[filter_type, filter_value],force)
 
     def average_levenshtein_distance(self,mode="old20", force=False):
-        moy_score = dict()
-        for label in list(self.content.keys()):
-            if self.scores[mode][label] == None or force:
-                moy = 0
-                for text in self.content[label]:
-                    moy += text.average_levenshtein_distance(mode,force)
-                self.scores[mode][label] = moy / len(self.content[label])
-                moy_score[label] = self.scores[mode][label]
-            else:
-                moy_score[label] = self.scores[mode][label]
-        return moy_score
+        return self.call_score(mode,[],force)
+    def old20(self, formula_type=None, force=False):
+        """Returns average Orthographic Levenshtein Distance 20 (OLD20) in a text"""
+        return self.average_levenshtein_distance("old20", force)
 
+    def pld20(self, formula_type=None, force=False):
+        """Returns average Phonemic Levenshtein Distance 20 (OLD20)"""
+        return self.average_levenshtein_distance("pld20", force)
+    
     # NOTE : might do these 3 at start-up instead.
     #def count_pronouns(self,mode="text"):
     #    if "nb_pronouns" in list(self.statistics.keys()):
@@ -342,28 +269,8 @@ class ParsedCollection:
     #    return self.statistics["nb_proper_nouns"]
 
     def lexical_cohesion_tfidf(self, mode="text", force=False):
-        moy_score = dict()
-        for label in list(self.content.keys()):
-            if self.scores["cosine_similarity_tfidf"][label] == None or force:
-                moy = 0
-                for text in self.content[label]:
-                    moy += text.lexical_cohesion_tfidf(mode, force)
-                self.scores["cosine_similarity_tfidf"][label] = moy / len(self.content[label])
-                moy_score[label] = self.scores["cosine_similarity_tfidf"][label]
-            else:
-                moy_score[label] = self.scores["cosine_similarity_tfidf"][label]
-        return moy_score
+        return self.call_score("cosine_similarity_tfidf",[mode],force)
 
     # NOTE: this seems to output the same values, whether we use text or lemmas, probably due to the type of model used.
-    def lexical_cohesion_LDA(self, mode="text", force=False):
-        moy_score = dict()
-        for label in list(self.content.keys()):
-            if self.scores["cosine_similarity_LDA"][label] == None or force:
-                moy = 0
-                for text in self.content[label]:
-                    moy += text.lexical_cohesion_LDA(mode, force)
-                self.scores["cosine_similarity_LDA"][label] = moy / len(self.content[label])
-                moy_score[label] = self.scores["cosine_similarity_LDA"][label]
-            else:
-                moy_score[label] = self.scores["cosine_similarity_LDA"][label]
-        return moy_score
+    def lexical_cohesion_LDA(self ,mode="text", force=False):
+        return self.call_score("cosine_similarity_LDA",[mode],force)

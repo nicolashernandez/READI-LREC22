@@ -62,6 +62,7 @@ class ParsedText:
         self.statistics["totalCharacters"] = 0
         self.statistics["totalSyllables"] = 0
         self.statistics["nbPolysyllables"] = 0
+        self.statistics["vocabulary"] = set()
         for sentence in self.content:
             self.statistics["totalWords"] += len(sentence)
             self.statistics["totalLongWords"] += len([token for token in sentence if len(token)>6])
@@ -69,6 +70,9 @@ class ParsedText:
             self.statistics["totalSyllables"] += sum(utils.syllablesplit(word) for word in sentence)
             self.statistics["nbPolysyllables"] += sum(utils.syllablesplit(word) for word in sentence if utils.syllablesplit(word)>=3)
             #self.statistics["nbPolysyllables"] += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
+            for token in sentence:
+                self.statistics["vocabulary"].add(token)
+            
     
     def show_text(self):
         return utils.convert_text_to_string(self.content)
@@ -89,7 +93,7 @@ class ParsedText:
         If the underlying function needs no additional arguments, just pass en empty list, e.g : instance.call_score("pppl",[],True)
 
         :param str score_name: Name of a score recognized by ReadabilityProcessor.informations.
-        :param list(any) arguments: List of type of scores to exclude, compared to the informations object to possibly remove unused dependencies
+        :param list(any) arguments: Values used to change behavior of underlying functions.
         :param bool force: Indicates whether to force the calculation of a score or not.
         """
         # check if score_name already in scores:
@@ -233,7 +237,7 @@ class ParsedText:
 
     def pld20(self, formula_type=None, force=False):
         """Returns average Phonemic Levenshtein Distance 20 (OLD20)"""
-        return self.average_levenshtein_distance("pld20",  force)
+        return self.average_levenshtein_distance("pld20", force)
 
 
     # Measures based on text cohesion
