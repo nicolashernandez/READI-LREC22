@@ -16,7 +16,7 @@ class ParsedCollection:
 
     Might be created as a result of ReadabilityProcessor.parseCollection(), or might be instantiated on its own. Not sure for now.
     """
-    def __init__(self, readability_processor, list_of_texts):
+    def __init__(self, list_of_texts, readability_processor):
         """
         Constructor of the ParsedCollection class, creates the following attributes:
         self.readability_processor, self.content, self.scores, self.statistics
@@ -25,9 +25,14 @@ class ParsedCollection:
         """
         self.readability_processor = readability_processor
 
-
         # TODO: Placeholder creation of self.content, create a function that converts different types of (labels, texts) collections into the same structure
         # Also, if using a list of texts, make a dict(default = list_of_texts) for compatibility, we'll suppose every text has the same label.
+        if isinstance(list_of_texts, str):
+            raise TypeError("Input type is 'str', please provide a dict() or a list(list()) instead")
+        # Recognising a list of lists, weird but ok.
+        if any(isinstance(el, list) for el in list_of_texts):
+            print("should be list of lists, can do something to convert there")
+            print("just assign a label 1,2,3,4,5 to each label or something, doesn't really matter, but warn user.")
         self.content = dict(default = list_of_texts)
 
         # Initialize scores by setting them all to None
@@ -61,9 +66,6 @@ class ParsedCollection:
                     self.statistics[label]["nbPolysyllables"] += sum(utils.syllablesplit(word) for word in sentence if utils.syllablesplit(word)>=3)
                     #self.statistics["nbPolysyllables"] += sum(1 for word in sentence if utils.syllablesplit(word)>=3)
     
-    #TODO: convert that to calculate mean scores for each label
-    
-
     def show_statistics(self):
         """
         Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.

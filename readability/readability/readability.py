@@ -155,6 +155,42 @@ class Readability:
     def parse(self,text):
         """Creates a ParsedText instance that relies on the ReadabilityProcessor in order to output various readability measures."""
         return parsed_text.ParsedText(text,self)
+    
+    def parseCollection(self,collection):
+        """aaa"""
+        # Structure is dictionary, try to adapt the structure to be : dict(class_1:{text1,text2},class_2{text1,text2}..)
+        if isinstance(collection,dict):
+            # TODO: try to adapt dict to follow structure
+            # TODO: also parse each text.
+            print("case dict")
+            return collection
+            #return parsed_collection.ParsedCollection(collection, self)
+
+
+        # Structure type is list, supposing that each initial index corresponds to a text.
+        # TODO: need to differentiate between list(text) and list(list(text)) somehow..
+        elif isinstance(collection, list):
+            #Try catch utils.conver_text_to_string(collection[0])
+            try:
+                # Check if collection contains a list of texts or a list of lists of texts
+                # This raises an exception if not applied on a text.
+                utils.convert_text_to_string(collection[0])
+            except Exception:
+                # Case with multiple lists of texts:
+                print("multi list")
+                print("does this break")
+                return "not_implemented_yet"
+            else:
+                # Case with one list of texts:
+                print("do the thing")
+                copy_collection = []
+                for text in collection:
+                    copy_collection.append(self.parse(text))
+                copy_collection = dict(default_label = copy_collection)    
+                return parsed_collection.ParsedCollection(copy_collection, self)
+
+        else:
+            raise TypeError("Format of received collection not recognized, please give dict(class_name:{list(text)}) or list(list(text))")
 
     #NOTE : maybe also provide load_dependency(self,value)
     def load(self,value):
@@ -218,29 +254,29 @@ class Readability:
         else:
             return func(content)
         
-    def gfi(self, content):
+    def gfi(self, content, statistics = None):
         """Returns Gunning Fog Index"""
-        return self.score("gfi", content)
+        return self.score("gfi", content, statistics)
 
-    def ari(self, content):
+    def ari(self, content, statistics = None):
         """Returns Automated Readability Index"""
-        return self.score("ari", content)
+        return self.score("ari", content, statistics)
 
-    def fre(self, content):
+    def fre(self, content, statistics = None):
         """Returns Flesch Reading Ease"""
-        return self.score("fre", content)
+        return self.score("fre", content, statistics)
 
-    def fkgl(self, content):
+    def fkgl(self, content, statistics = None):
         """Returns Flesch–Kincaid Grade Level"""
-        return self.score("fkgl", content)
+        return self.score("fkgl", content, statistics)
 
-    def smog(self, content):
+    def smog(self, content, statistics = None):
         """Returns Simple Measure of Gobbledygook"""
-        return self.score("smog", content)
+        return self.score("smog", content, statistics)
 
-    def rel(self, content):
+    def rel(self, content, statistics = None):
         """Returns Reading Ease Level (Adaptation of FRE for french)"""
-        return self.score("rel", content)
+        return self.score("rel", content, statistics)
 
     #TODO : repurpose this inside ParsedText as a traditional-only version (for reproducing the paper's contents)
     # and a version with every available score
@@ -298,8 +334,8 @@ class Readability:
         'root' formula uses the square root for the denominator,
         'corrected' formula mutliplies the number of words by two before taking the square root for the denominator.
 
-        :param str type: Which text diversity measure to use : "ttr" is text token ratio, "ntr" is noun token ratio
-        :param str mode: What kind of formula version to use, if applicable : "corrected", "root", and default standard are available for token ratios.
+        :param str ratio_type: Which text diversity measure to use: "ttr" is text token ratio, "ntr" is noun token ratio
+        :param str formula_type: What kind of formula version to use: "corrected", "root", and default standard are available for token ratios.
         :return: a measure of text diversity, or a dictionary of these measures
         :rtype: :rtype: Union[float,dict[str][list(float)]]
         """
@@ -324,13 +360,13 @@ class Readability:
     def dubois_proportion(self, content, filter_type = "total", filter_value = None):
         """
         Outputs the proportion of words included in the Dubois-Buyse word list.
-        Can specify the ratio for words appearing in specific echelons, ages|school grades, or three-year cycles.
+        Can specify the ratio for words appearing in specific echelons, ages, or three-year cycles.
 
         :param str filter_type: Which variable to use to filter the word list : 'echelon', 'age', or 'cycle'
         :param str filter_value: Value (or iterable containing two values) for subsetting the word list.
         :type filter_value: Union[int, tuple, list]
         :return: a ratio of words in the current text, that appear in the Dubois-Buyse word list.
-        :rtype: Union[float,dict[str][list(float)]]
+        :rtype: float
         """
         func = word_list_based.dubois_proportion
         if not self.check_score_and_dependencies_available("dubois_buyse_ratio"):

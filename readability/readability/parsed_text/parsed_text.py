@@ -82,9 +82,16 @@ class ParsedText:
             print(stat, "=", self.statistics[stat])
         return self.statistics
 
-    #idea, if providing args... args are provided. what a concept I know
-    #presume args is a tuple since that's how we'll handle it.
     def call_score(self, score_name, arguments=None, force=False):
+        """
+        Helper function that gets a score if it already exists, otherwise checks if it's available, if so call the relevant function from the ReadabilityProcessor
+        Use of function is : instance.call_score("score_name", arguments:[arg1,arg2,argi..], force:bool)
+        If the underlying function needs no additional arguments, just pass en empty list, e.g : instance.call_score("pppl",[],True)
+
+        :param str score_name: Name of a score recognized by ReadabilityProcessor.informations.
+        :param list(any) arguments: List of type of scores to exclude, compared to the informations object to possibly remove unused dependencies
+        :param bool force: Indicates whether to force the calculation of a score or not.
+        """
         # check if score_name already in scores:
         if self.scores[score_name] is not None and not force:
             return self.scores[score_name]
@@ -94,6 +101,8 @@ class ParsedText:
             func = self.readability_processor.informations[score_name]["function"]
             if arguments is None:
                 arguments = self.readability_processor.informations[score_name]["default_arguments"].values()
+                #print("WARNING : defaulting to default arguments :", arguments)
+
             self.scores[score_name] = func(self.content, *(arguments))
             return self.scores[score_name]
         # If function is unavailable, return None to indicate so.
@@ -101,6 +110,12 @@ class ParsedText:
             return None
 
     def show_scores(self,force=False):
+        """
+        Returns a dataframe containing each already calculated score, can also force calculation with default values.
+        
+        :param bool force: Indicates whether to force the calculation of each score
+        """
+        # NOTE: one behavior could be added : return every score if possible, and calculate the rest, instead of calculating everything.
         df = []
         if force:
             for score_name in list(self.scores.keys()):
@@ -111,11 +126,16 @@ class ParsedText:
         return df
 
     # Traditional measures
-    def traditional_score(self,score_name):
-        if self.scores[score_name] == None:
-            self.scores[score_name] = self.readability_processor.score(score_name,self.content,self.statistics)
-        return self.scores[score_name]
     
+    def traditional_score(self,score_name,force=False):
+        """
+        Called by methods : gfi | ari | fre | fkgl | smog | rel. Serves as a entry-point to the underlying function "score" of ReadabilityProcessor
+        
+        :param str score_name: Name of a score recognized by ReadabilityProcessor.informations.
+        :param bool force: Indicates whether to force the calculation of a score or not.
+        """
+        return self.call_score(score_name,[self.statistics],force)
+
     def gfi(self):
         """Returns Gunning Fog Index"""
         return self.traditional_score("gfi")
@@ -142,19 +162,32 @@ class ParsedText:
 
 
     # Measures related to perplexity
-    def perplexity(self):
-        if self.scores["pppl"] == None:
-            self.scores["pppl"] = self.readability_processor.perplexity(self.content)
-        return self.scores["pppl"]
+    def perplexity(self, force=False):
+        """
+        Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
+
+        :param bool force: Indicates whether to force the calculation of a score or not.
+        :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
+        :rtype: float
+        """
+        return(self.call_score("pppl",[],force))
     
-    def stub_rsrs(self):
-        if self.scores["rsrs"] == None:
-            self.scores["rsrs"] = self.readability_processor.stub_rsrs(self.content)
-        return self.scores["rsrs"]
+    def stub_rsrs(self, force=False):
+        return(self.call_score("rsrs",[],force))
 
 
     # Measures related to text diversity
     def diversity(self, ratio_type, formula_type=None, force=False):
+        """
+        Outputs a measure of text diversity based on which feature to use, and which version of the formula is used.
+        Default formula is 'nb lexical items' / 'nb unique lexical items',
+        'root' formula uses the square root for the denominator,
+        'corrected' formula mutliplies the number of words by two before taking the square root for the denominator.
+
+        :param str ratio_type: Which text diversity measure to use: "ttr" is text token ratio, "ntr" is noun token ratio
+        :param str formula_type: What kind of formula to use: "corrected", "root", and default standard are available for token ratios.
+        :param bool force: Indicates whether to force the calculation of a score or not.
+        """
         return self.call_score(ratio_type,[formula_type],force)
 
     def ttr(self, formula_type=None, force=False):
@@ -167,17 +200,44 @@ class ParsedText:
     
 
     # Measures based on pre-existing word lists
-    def dubois_proportion(self,filter_type="total",filter_value=None, force=False):
-        if self.scores["dubois_buyse_ratio"] == None or force:
-            self.scores["dubois_buyse_ratio"] = self.readability_processor.dubois_proportion(self.content,filter_type,filter_value)
-        return self.scores["dubois_buyse_ratio"]
+    def dubois_proportion(self,filter_type="total", filter_value=None, force=False):
+        """
+        Outputs the proportion of words included in the Dubois-Buyse word list.
+        Can specify the ratio for words appearing in specific echelons, ages or three-year cycles.
 
-    def average_levenshtein_distance(self,mode="old20", force=False):
-        if self.scores[mode] == None or force:
-            self.scores[mode] = self.readability_processor.average_levenshtein_distance(self.content,mode)
-        return self.scores[mode]
+        :param str filter_type: Which variable to use to filter the word list : 'echelon', 'age', or 'cycle'
+        :param str filter_value: Value (or iterable containing two values) for subsetting the word list.
+        :type filter_value: Union[int, tuple, list]
+        :param bool force: Indicates whether to force the calculation of a score or not.
+        :return: a ratio of words in the current text, that appear in the Dubois-Buyse word list.
+        :rtype: float
+        """
+        return self.call_score("dubois_buyse_ratio",[filter_type,filter_value],force)
 
-    # NOTE : might do these 3 at start-up instead.
+    def average_levenshtein_distance(self, mode="old20", force=False):
+        """
+        Returns the average Orthographic Levenshtein Distance 20 (OLD20), or its phonemic equivalent (PLD20).
+        Currently using the Lexique 3.0 database for French texts, version 3.83. More details here : http://www.lexique.org/
+        OLD20 is an alternative to the orthographical neighbourhood index that has been shown to correlate with text difficulty.
+
+        :param str mode: What kind of value to return, OLD20 or PLD20.
+        :param bool force: Indicates whether to force the calculation of a score or not.
+        :return: Average of OLD20 or PLD20 for each word in current text
+        :rtype: Union[float,dict[str][list(float)]]
+        """
+        return self.call_score(mode,[],force)
+
+    def old20(self, formula_type=None, force=False):
+        """Returns average Orthographic Levenshtein Distance 20 (OLD20) in a text"""
+        return self.average_levenshtein_distance("old20", force)
+
+    def pld20(self, formula_type=None, force=False):
+        """Returns average Phonemic Levenshtein Distance 20 (OLD20)"""
+        return self.average_levenshtein_distance("pld20",  force)
+
+
+    # Measures based on text cohesion
+    # NOTE : might do the following 3 at start-up instead.
     def count_pronouns(self,mode="text"):
         if "nb_pronouns" in list(self.statistics.keys()):
             if self.statistics["nb_pronouns"] == None:
@@ -203,12 +263,8 @@ class ParsedText:
         return self.statistics["nb_proper_nouns"]
 
     def lexical_cohesion_tfidf(self, mode="text", force=False):
-        if self.scores["cosine_similarity_tfidf"] == None or force:
-            self.scores["cosine_similarity_tfidf"] = self.readability_processor.lexical_cohesion_tfidf(self.content,mode)
-        return self.scores["cosine_similarity_tfidf"]
+        return self.call_score("cosine_similarity_tfidf",[mode],force)
 
     # NOTE: this seems to output the same values, whether we use text or lemmas, probably due to the type of model used.
     def lexical_cohesion_LDA(self ,mode="text", force=False):
-        if self.scores["cosine_similarity_LDA"] == None or force:
-            self.scores["cosine_similarity_LDA"] = self.readability_processor.lexical_cohesion_LDA(self.content,mode)
-        return self.scores["cosine_similarity_LDA"]
+        return self.call_score("cosine_similarity_LDA",[mode],force)
