@@ -1,11 +1,12 @@
 from . import models
+from ..utils import utils
 import numpy as np
 import ktrain
 import os
 from ktrain import text
 from csv import DictReader
 
-DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
+DATA_ENTRY_POINT = utils.DATA_ENTRY_POINT
 
 def demo_getFastText(DATA_PATH, class_names):
     """Uses the ktrain library to load the fastText model, then creates a learner object based on data split into train/test"""

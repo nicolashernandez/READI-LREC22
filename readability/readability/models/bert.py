@@ -1,11 +1,12 @@
 from . import models
+from ..utils import utils
 import random
 import csv
 import ktrain
 from ktrain import text
 import os
 
-DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
+DATA_ENTRY_POINT = utils.DATA_ENTRY_POINT
 
 def demo_loadCorpusForTransformer(DATA_PATH, random_seed = 42, percent_train = 90):
     """Loads a csv file, and splits it into a train/test subset."""
