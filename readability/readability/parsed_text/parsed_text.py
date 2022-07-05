@@ -84,7 +84,7 @@ class ParsedText:
         """
         for stat in list(self.statistics.keys()):
             print(stat, "=", self.statistics[stat])
-        return self.statistics
+        return None
 
     def call_score(self, score_name, arguments=None, force=False):
         """

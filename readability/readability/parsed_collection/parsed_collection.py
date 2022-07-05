@@ -37,8 +37,6 @@ class ParsedCollection:
             for label in list(self.content.keys()):
                 self.scores[info][label] = None
         
-
-        #First off, need to redo this, what's the point of exploiting parsedtext huh
         self.statistics = dict()
         for label in list(self.content.keys()):
             self.statistics[label] = dict()
@@ -48,8 +46,7 @@ class ParsedCollection:
             self.statistics[label]["totalCharacters"] = 0
             self.statistics[label]["totalSyllables"] = 0
             self.statistics[label]["nbPolysyllables"] = 0
-            
-                
+                    
             for text in self.content[label]:
                 for stat in list(self.statistics[label].keys()):
                     self.statistics[label][stat] += text.statistics[stat]
@@ -74,53 +71,49 @@ class ParsedCollection:
                 else:
                     print(stat, "=", self.statistics[label][stat])
 
-    def corpus_info(self):
+    def remove_outliers(self,score_type = None, stddevratio=1):
         """
-        Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.
-        In this case, this will output the mean values of each score for each class.
+        Outputs a corpus, after removing texts which are considered to be "outliers", based on a standard deviation ratio.
+        A text is an outlier if its value is lower or higher than this : mean +- standard_deviation * ratio
+        In order to exploit this new corpus, you'll need to make a new Readability instance.
+        For instance : new_r = Readability(r.remove_outliers(r.perplexity(),1))
+
+        :return: a corpus, in a specific format where texts are represented as lists of sentences, which are lists of words.
+        :rtype: dict[str][str][str][str]
         """
-        # TODO: Rewrite this to exploit self.statistics and be more legible.
+        #I can get the moy no problem, but I do need the stddev. eh
+        texts = self.content
+        moy = list(self.call_score(score_type).values())
 
-        # Build vocabulary. NOTE: maybe do that at init
-        vocab = dict()
-        for level in self.content.keys():
-            vocab[level] = list()
-            for text in self.content[level]:
-                unique = set()
-                for sent in text.content:
-                    #for sent in text['content']:
-                    for token in sent:
-                        unique.add(token)
-                vocab[level].append(unique)
+        stddev = list()
+        for index, label in enumerate(list(self.content.keys())):
+            inner_stddev=0
+            for text in texts[label]:
+                inner_stddev += ((text.call_score(score_type)-moy[index])**2)/len(texts[label])
+            inner_stddev = math.sqrt(inner_stddev)
+            stddev.append(inner_stddev)
 
+        outliers_indices = texts.copy()
+        for index, label in enumerate(list(self.content.keys())):
+            outliers_indices[label] = [idx for idx in range(len(texts[label])) if texts[label][idx].call_score(score_type) > moy[index] + (stddevratio * stddev[index]) or texts[label][idx].call_score(score_type) < moy[index] - (stddevratio * stddev[index])]
+            print("nb textes enleves(",label,") :", len(outliers_indices[label]),sep="")
+            print(outliers_indices[label])
 
-        # Vocabulary size per class
-        taille_vocab =list()
-        taille_vocab_moy=list()
-        all_vocab =set()
-        for level in list(self.content.keys()):
-            vocab_level = set()
-            for text in vocab[level]:
-                for token in text:
-                    all_vocab.add(token)
-                    vocab_level.add(token)
-            taille_vocab.append(len(vocab_level))
+        corpus_no_outliers = copy.deepcopy(texts)
+        for label in list(self.content.keys()):
+            offset = 0
+            for index in outliers_indices[label][:]:
+                corpus_no_outliers[label].pop(index - offset)
+                offset += 1
+            print("New number of texts for class", label, ":", len(corpus_no_outliers[label]))
+        print("In order to use this new corpus, you'll have to make a new Readability instance.")
 
-        taille_vocab.append(len(all_vocab))
-
-        # Mean size of vocabulary
-        taille_vocab_moy = list()
-        taille_moy_total = 0
-        for level in list(self.content.keys()):
-            moy=0
-            for text in vocab[level]:
-                taille_moy_total+= len(text)/self.statistics[level]["totalTexts"]
-                moy+=len(text)/len(vocab[level])
-            taille_vocab_moy.append(moy)
-        taille_vocab_moy.append(taille_moy_total)
-
-        return vocab
-
+        #So.. we have a dictionary associating labels and ParsedTexts. need to make an import function in Readability I suppose.
+        # Or do that now.
+        #Some of the values have to be re-calculated though..
+        #Not the ones within the ParsedTexts themselves, but the ones in ParsedCollection..
+        #Or I can just re-init a new CorpusCollection instance. yeah. it does the init stuff, values of texts are known, but corpus specific values aren't.
+        return ParsedCollection(corpus_no_outliers,self.readability_processor)
 
     def call_score(self,score_name, arguments=None, force=False):
         """
@@ -150,14 +143,16 @@ class ParsedCollection:
         return moy_score
 
     def show_scores(self,force=False):
-        df = []
         if force:
             for score_name in list(self.scores.keys()):
                 self.scores[score_name] = self.call_score(score_name, force=True)
-        
-        # Append each already-calculated score to a dataframe
-        df.append(self.scores)
-        df = pd.DataFrame(df)
+        df = []
+        score_names = []
+        for score_name in list(self.scores.keys()):
+            df.append(list(self.scores[score_name].values()))
+            score_names.append(score_name)
+        df = pd.DataFrame(df,columns = list(self.content.keys()))
+        df.index = score_names
         return df
     
 

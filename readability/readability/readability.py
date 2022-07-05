@@ -29,19 +29,10 @@ from .parsed_collection import parsed_collection
 #     Experiment further : X Unfortunately, I haven't given much thought into how estimating readability could be improved, or if our hypotheses are sound.
 
 # For now :
-#     Fix notebook.. again. I used things like os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
-#     to reference the data folder that is a parent of the lib, but some user environments
-#     refer to the lib via a '/usr/local/lib/python3.7/....' path (or something similar since it is installed..).
-#     So it fails since the data folder isn't included in the library.
-#     Either duplicate data inside the lib or apply a band-aid fix to the notebook (Not a good idea)
 
 #     Continue developping discourse/cohesion/coherence features.
-#     Ajouter une fonction pour générer tableau récap des features disponibles (ou celles déja calculées aprés .compile())
 #     Permettre de calculer scores|correlations en + automatiquement (Calculer scores de corr pour features cohesion (1er corpus minimum))
 #     Ajouter mesure de semi-partial correlation
-#     Factoriser appels NLP/models pour être sûr qu'on ne duplique pas de ressources
-#     Séparer initialisation object Readi | Parsing de texte
-# parse lis un dict measures (ce dict measures contient ce qui est dispo selon l'init du readability processor, un dict avec 3 truc : 'possible', 'pas_possible')
 
 # Extra (not urgent) :
 #     Add more corpuses such as vikidia or wikimini : X (will probably start june 22 afternoon) :
