@@ -12,7 +12,6 @@ import math
 
 import pandas as pd
 import spacy
-from .data import data
 from .utils import utils
 from .stats import diversity, perplexity, common_scores, word_list_based, syntactic, discourse, rsrs
 from .methods import methods
