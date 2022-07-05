@@ -8,6 +8,7 @@ import math
 
 import pandas as pd
 import spacy
+from scipy.stats import pearsonr
 from ..utils import utils
 
 class ParsedCollection:
@@ -142,15 +143,35 @@ class ParsedCollection:
                 moy_score[label] = None
         return moy_score
 
-    def show_scores(self,force=False):
+    def show_scores(self,force=False,correlation=None):
         if force:
             for score_name in list(self.scores.keys()):
                 self.scores[score_name] = self.call_score(score_name, force=True)
         df = []
         score_names = []
-        for score_name in list(self.scores.keys()):
-            df.append(list(self.scores[score_name].values()))
-            score_names.append(score_name)
+        if correlation == "pearson":
+            pearson = []
+            for score_name in list(self.scores.keys()):
+                df.append(list(self.scores[score_name].values()))
+                score_names.append(score_name)
+                labels = []
+                score_as_list = []
+                if list(self.scores[score_name].values())[0] is None:
+                    pearson.append(None)
+                else:
+                    for label in list(self.content.keys()):
+                        for text in self.content[label]:
+                            score_as_list.append(text.call_score(score_name))
+                            labels.append(list(self.content.keys()).index(label))
+                    pearson.append(pearsonr(score_as_list,labels)[0])
+            df = pd.DataFrame(df,columns = list(self.content.keys()))
+            df["Pearson Score"] = pearson
+            df.index = score_names
+            return df
+        elif correlation is None:
+            for score_name in list(self.scores.keys()):
+                df.append(list(self.scores[score_name].values()))
+                score_names.append(score_name)
         df = pd.DataFrame(df,columns = list(self.content.keys()))
         df.index = score_names
         return df
