@@ -10,6 +10,7 @@ from collections import Counter
 import pandas as pd
 import os
 import requests
+import coreferee
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -24,27 +25,32 @@ from gensim.matutils import cossim
 # Cohesion : text represented by explicit formal grammatical ties aka how are parts related to each other
 # Cohesion => co-reference, anaphoric chains, entity density and cohesion features, lexical cohesion measures,
 # and POS tag-based cohesion measures.
-# Clarification : Entity cohesion ~~ relative freq of possible transtions between syntactic functions played by same entity in adjacent sentences
+# Clarification : Entity cohesion ~~ relative freq of possible transitions between syntactic functions played by same entity in adjacent sentences
 # Lexical cohesion ~ features like frequency of content word repetition (adjacent), Latent Semantic Analysis for similarity,
 # Lexical Tightness for mean value of Positiv Normalized Pointwise Mutual Information for all pairs of content-word tokens in text
 # POS tag-based is measuring the ratio of pronoun and article parts-of-speech
 
 # Todirascu analyzed 65 discourse features, but found that they don't contribute much compared to traditional or simple formulas,
 # Let's make available the 6 that were significant with semi-partial correlation.
-# Number of pronouns per word | Number of personal pronouns
-# Average word length of entity
-# Object to None : distance between 2 consecutive mentions of same chain is larger than 1 sentence.
-# First mention in chain being specific deictic pronoun (deictic = meaning depends on context, "here","next Tuesday","the thing there", etc.)
+# Number of pronouns per word | Number of personal pronouns : V except for personal pronouns
+# Average word length of entity : X
+# Object to None : distance between 2 consecutive mentions of same chain is larger than 1 sentence. : X
+# First mention in chain being specific deictic pronoun (deictic = meaning depends on context, "here","next Tuesday","the thing there", etc.) : X
 # I can't figure which one was the 6th best feature.
 
-# Try to implement each value, and their not so significative variant (could be useful, implementable at the same time).
+# Try to implement each value, and their not so significative variant(s) (could be useful, implementable at the same time).
 # Refer to todirascu 4.1 to view
 # Since we'll later implement a semi-partial correlation evaluation.
 
 # Future for chains :
-# https://github.com/boberle/cofr
-# https://github.com/explosion/coreferee
-# https://github.com/mehdi-mirzapour/French-CRS
+# https://github.com/boberle/cofr (Seems good but might be hard-ish to implement) (uses BERT-Multilingual as a dependency)
+# https://github.com/explosion/coreferee (doesn't show "obvious" referents, easy to implement but might be a tad hard to extract some features)
+# ^ Models are 20GB in size??? jeez. Well it does require conversion into word vectors after all
+# https://github.com/mehdi-mirzapour/French-CRS (not usable at all, requires end-user to make a virtualenv and jump through hoops)
+
+
+
+
 
 # Use a tool called RefGen for French? (longo & todirascu 2010,2013), however it can't recognize resumptive anaphora, and can't do complex referents
 # like groups or collections of objects. also it ignores adverbs, and only identifies simple cases of antecedance.
@@ -52,6 +58,8 @@ from gensim.matutils import cossim
 # It might be relevant to include ways to test the importance of these features for users of this lib, maybe just provide multiple linear regression
 # and semi-partial correlation at the same time.
 
+#found this guy talking about coreference chains https://boberle.com/fr/projects/coreference-chains-in-research-articles/
+# read this to understand how stuff works https://aclanthology.org/P19-1066.pdf Coreference Resolution with Entity Equalization
 
 spacy_pronoun_tags = ["PRON", "PRP", "PRP$", "WP", "WP$", "PDAT", "PDS", "PIAT", "PIDAT", "PIS", "PPER", "PPOSAT", "PPOSS", "PRELAT", "PRELS", "PRF", "PWAT", "PWAV", "PWS", "PN"]
 DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
@@ -172,30 +180,68 @@ def average_cosine_similarity_LDA(model, text, nlp = None, mode="text"):
 
     return average_cosine_similarity
 
-def entity_density(text,nlp=None, mode="document"):
+# Things that can be done with coreferee :
+# First off : need to downgrade spacy and the model from 3.3.0 to 3.2.0 due to compatibility issues. Oh well.
+# Next, how to use :
+# put coreferee in setup.cfg
+# do python3 -m coreferee install fr (figure out how to do that from within script or within setup.cfg or elsewhere)
+
+# nlp = spacy.load("fr_core_news_sm")
+# nlp.add_pipe("coreferee")
+
+# doc = nlp("Même si elle était très occupée par son travail, Julie en avait marre. Alors, elle et son mari décidèrent qu'ils avaient besoin de vacances. Ils allèrent en Espagne car ils adoraient le pays)
+
+# Can use doc._.coref_chains to get the following :
+
+# What is returned
+# doc.coref_chains is a chain holder, it's just a group of chains
+# doc.coref_chains[0] is a chain, it holds mentions, can also do X.most_specific_mention_index to get most relevant representation of entity
+# doc.coref_chains[0][0] is a mention, can hold multiple things in it (a composite mention like "Jane et son mari" would give [Jane,Mari])
+# It gives a token index so we can just do doc[doc.coref_chains[0][0].token_indexes[0]] to access the token and do spacy stuff
+# Of course this is a naive way that only works for mentions that refer to a singular entity.
+
+# Important note : Using only this won't be able to get the features noted in 3. entity cohesion with the transitions 
+# aka "subject to subject" where X is a subject in sentence n, and the reference to X in sentence n+1 is also a subject.
+# these can take value subject, object, other, or none (when does not appear)
+# So our developped method should consider sentence per sentence and try to figure out something.
+# But we'll develop that after the "basic" use of the previous
+
+# first n°32 and 33 : Number of entities per document normalized by number of words
+# And proportion of unique entities normalized by number of words.
+
+def entity_density(text,nlp=None,unique=False):
     """
     Entity density ~~ total|average number of all/unique entities in document
-    Argument mode allows to provide a feature for entire document, or sentence per sentence
+    :param bool unique: Whether to return proportion of all entities in document, or only unique entities.
     """
-    
-    return 0
+    doc = utils.convert_text_to_string(text)
 
+    if unique:
+        return len(nlp(doc)._.coref_chains) / len(text)
+    else :
+        counter = 0
+        for chain in nlp(doc)._.coref_chains:
+            counter += len(chain)
+        return counter / len(text)
 
-def average_word_length_per_entity(text,nlp = None,mode="document"):
+# And 34 : Average number of words per entity normalized by number of words.
+# Problem is that coreferee only gives us one token per entity.. so things like New York will be shortened to New
+# If only I could combine merge_entities with this.. or... maybe i call merge entities on this then i use coreferee?
+# Nevermind, coreferee ignores merge_entities. 
+# And using spacy.ents only works for named entities. hmmm..
+# Perhaps I could get every index, check if one of them is the same as an ent.start in list of ents
+# If so, then get full size
+# However this won't work for not-named entities that are composite, like "cette femme".
+def average_word_length_per_entity(text,nlp=None):
     """
     This feature was significant in Todirascu's paper.
     Argument mode allows to provide a feature for entire document, or sentence per sentence
     """
     doc = utils.convert_text_to_string(text)
+    
+    #Okay so get the
 
-    # TODO: If no entities are recognized then raise exception
-    # Also, spacy's NER module seems to not be that great for French, I should try out NLTK real quick to see if there's any significant difference
-
-    #Oh wait it does, just not if the very first word refers to the subject. Weird but ok.
-    for ent in nlp(doc).ents:
-        print(ent.text, ent.start_char, ent.end_char, ent.label_)
-        print(len(ent.text))
-    #Then do a simple mean
+    
     return 0    
 
 def stub_entity_cohesion(text,nlp=None):
@@ -212,7 +258,6 @@ def stub_lexical_cohesion(text,nlp=None):
     # Lexical Tightness for mean value of Positiv Normalized Pointwise Mutual Information for all pairs of content-word tokens in text
     """
     return 0
-#Re use part of dubois for some of todirascu's lexical cohesion notions
 
 
 
@@ -234,6 +279,5 @@ def distance_object_to_none(text,nlp = None):
     return 0
 
 #might skip this one if spacy can't recognize chains, or find another tool
-#Deictic are things like "en,y"? Not sure
 def first_chain_is_deictic(text,nlp=None):
     return 0

@@ -272,3 +272,5 @@ class ParsedText:
     # NOTE: this seems to output the same values, whether we use text or lemmas, probably due to the type of model used.
     def lexical_cohesion_LDA(self ,mode="text", force=False):
         return self.call_score("cosine_similarity_LDA",[mode],force)
+
+    # NOTE: 

@@ -116,7 +116,8 @@ class Readability:
             old20=dict(function=self.old20,dependencies=["lexique_dataframe"],default_arguments=dict()),
             pld20=dict(function=self.pld20,dependencies=["lexique_dataframe"],default_arguments=dict()),
             cosine_similarity_tfidf=dict(function=self.lexical_cohesion_tfidf,dependencies=[],default_arguments=dict(mode="text")),
-            cosine_similarity_LDA=dict(function=self.lexical_cohesion_LDA,dependencies=["fauconnier_model"],default_arguments=dict(mode="text"))
+            cosine_similarity_LDA=dict(function=self.lexical_cohesion_LDA,dependencies=["fauconnier_model"],default_arguments=dict(mode="text")),
+            entity_density=dict(function=self.entity_density,dependencies=["coreferee"],default_arguments=dict(unique=False))
             #following aren't 100% implemented yet
             #bert_value=dict(function=self.stub_BERT,dependencies=["BERT"]),
             #fasttext_value=dict(function=self.stub_fastText,dependencies=["fastText"]),
@@ -139,7 +140,7 @@ class Readability:
         # Create a dependencies dictionary, and put what's needed in there after loading the external ressources
         self.dependencies = {}
         for dependency in dependencies_to_add:
-            self.dependencies[dependency] = utils.load_dependency(dependency)
+            self.dependencies[dependency] = utils.load_dependency(dependency,self.nlp)
 
 
     # Utility functions : parse/load/checks
@@ -203,7 +204,7 @@ class Readability:
             # Check if there's a dependency, and handle it if wasn't imported already
             for dependency in self.informations[value]["dependencies"]:
                 if dependency not in list(self.dependencies.keys()):
-                    self.dependencies[dependency] = utils.load_dependency(dependency)
+                    self.dependencies[dependency] = utils.load_dependency(dependency,self.nlp)
 
         elif value in list(self.informations.keys()):
             # Check if it's in self.informations to warn user it's already loaded
@@ -392,7 +393,8 @@ class Readability:
 
     def pld20(self, content):
         return self.average_levenshtein_distance(content, "pld20")
-
+        
+    # Measures related to text cohesion :
     # NOTE : These 3 could be grouped together in the same function, and just set an argument type="X"
     def count_pronouns(self, content, mode="text"):
         func = discourse.nb_pronouns
@@ -418,6 +420,15 @@ class Readability:
             raise RuntimeError("measure 'cosine_similarity_LDA' cannot be calculated.")
         func = discourse.average_cosine_similarity_LDA
         return func(self.dependencies["fauconnier_model"],content,self.nlp,mode)
+
+    def entity_density(self,content,unique=False):
+        if not self.check_score_and_dependencies_available("entity_density"):
+            raise RuntimeError("measure", "entity_density", "cannot be calculated.")
+        func = discourse.entity_density
+        return func(content,self.nlp,unique)
+
+    def unique_entity_density(self,content):
+        return self.entity_density(content=content,unique=True)
 
 
     # Measures obtained from Machine Learning models :

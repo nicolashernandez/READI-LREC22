@@ -4,8 +4,10 @@ or things that are useful in order to reproduce the contents of the READI paper.
 """
 import pickle
 import os
+import sys
 import pandas as pd
 import requests
+import subprocess
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import torch
 from gensim.models import KeyedVectors
@@ -139,7 +141,7 @@ def count_occurences_in_document(text, spacy_filter, nlp=None, mode="text"):
     raise TypeError("Type of parameter 'mode' cannot be '", type(mode),"', needs to be 'text', or 'sentence'")
 
 
-def load_dependency(dependency_name):
+def load_dependency(dependency_name, nlp_processor=None):
     #TODO : go get every dependency import/configuration thing and return a dictionary of what's needed
     #It'll go in ReadabilityProcessor.dependencies[dependency] and can be accessed by other functions.
     if dependency_name == "GPT2_LM":
@@ -186,7 +188,11 @@ def load_dependency(dependency_name):
                 f.write(response.content)
             model = KeyedVectors.load_word2vec_format(os.path.join(DATA_ENTRY_POINT,"corpus_fauconnier.bin"), binary=True, unicode_errors="ignore")
             return model
-
+    elif dependency_name == "coreferee":
+        # Calling python -m coreferee install fr to make sure we have access to model if needed
+        subprocess.check_call([sys.executable, "-m", "coreferee", "install", "fr"])
+        nlp_processor.add_pipe("coreferee")
+        return dict(dummy_var="dummy_value")
     #These depend on actual data to be initialized, so i'll do it when I clean up BERT/fastText.
     elif dependency_name == "BERT":
         return dict(dummy_var="dummy_value")
