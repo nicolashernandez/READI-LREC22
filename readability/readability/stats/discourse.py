@@ -45,20 +45,13 @@ from gensim.matutils import cossim
 # Future for chains :
 # https://github.com/boberle/cofr (Seems good but might be hard-ish to implement) (uses BERT-Multilingual as a dependency)
 # https://github.com/explosion/coreferee (doesn't show "obvious" referents, easy to implement but might be a tad hard to extract some features)
-# ^ Models are 20GB in size??? jeez. Well it does require conversion into word vectors after all
 # https://github.com/mehdi-mirzapour/French-CRS (not usable at all, requires end-user to make a virtualenv and jump through hoops)
 
-
-
-
-
-# Use a tool called RefGen for French? (longo & todirascu 2010,2013), however it can't recognize resumptive anaphora, and can't do complex referents
-# like groups or collections of objects. also it ignores adverbs, and only identifies simple cases of antecedance.
 
 # It might be relevant to include ways to test the importance of these features for users of this lib, maybe just provide multiple linear regression
 # and semi-partial correlation at the same time.
 
-#found this guy talking about coreference chains https://boberle.com/fr/projects/coreference-chains-in-research-articles/
+# found this guy talking about coreference chains https://boberle.com/fr/projects/coreference-chains-in-research-articles/
 # read this to understand how stuff works https://aclanthology.org/P19-1066.pdf Coreference Resolution with Entity Equalization
 
 spacy_pronoun_tags = ["PRON", "PRP", "PRP$", "WP", "WP$", "PDAT", "PDS", "PIAT", "PIDAT", "PIS", "PPER", "PPOSAT", "PPOSS", "PRELAT", "PRELS", "PRF", "PWAT", "PWAV", "PWS", "PN"]
@@ -208,7 +201,6 @@ def average_cosine_similarity_LDA(model, text, nlp = None, mode="text"):
 
 # first n°32 and 33 : Number of entities per document normalized by number of words
 # And proportion of unique entities normalized by number of words.
-
 def entity_density(text,nlp=None,unique=False):
     """
     Entity density ~~ total|average number of all/unique entities in document
@@ -217,12 +209,23 @@ def entity_density(text,nlp=None,unique=False):
     doc = utils.convert_text_to_string(text)
 
     if unique:
+        #Number of chains ~~ Number of unique entities. Not exactly true.
         return len(nlp(doc)._.coref_chains) / len(text)
     else :
         counter = 0
         for chain in nlp(doc)._.coref_chains:
             counter += len(chain)
         return counter / len(text)
+
+# n°31 : Proportion of referring entities per document normalized by number of words :
+def proportion_referring_entity(text,nlp=None):
+    doc = utils.convert_text_to_string(text)
+    counter = 0
+    for chain in nlp(doc)._.coref_chains:
+        counter += len(chain) - 1 # Remove initial appearence of entity when counting number of referring entities
+    counter = counter / len(nlp(doc)._.coref_chains) # Average over number of chains
+    # Not sure there's a need to normalize at the word level
+    return counter / len(text)
 
 # And 34 : Average number of words per entity normalized by number of words.
 # Problem is that coreferee only gives us one token per entity.. so things like New York will be shortened to New
@@ -233,23 +236,26 @@ def entity_density(text,nlp=None,unique=False):
 # If so, then get full size
 # However this won't work for not-named entities that are composite, like "cette femme".
 def average_word_length_per_entity(text,nlp=None):
-    """
-    This feature was significant in Todirascu's paper.
-    Argument mode allows to provide a feature for entire document, or sentence per sentence
-    """
+
     doc = utils.convert_text_to_string(text)
-    
-    #Okay so get the
+    counter = 0
+    entity_dict = dict()
+    nb_entities = 0
+    for ent in nlp(doc).ents:
+        entity_dict[ent.start] = len(ent.text.split())
 
-    
-    return 0    
-
-def stub_entity_cohesion(text,nlp=None):
-    """
-    Need to figure out how this is calculated (Pitler and Nenkova 2008)
-    """
-    return 0
-
+    for chain in nlp(doc)._.coref_chains:
+        for mention in chain:
+            nb_entities = nb_entities + 1
+            for index in mention.token_indexes:
+                # At this point we have an index, we check if that index is part of a composite thing
+                if index in list(entity_dict.keys()):
+                    counter += entity_dict[index]
+                else:
+                    counter+=1
+    # Average over number of entities
+    counter = counter / nb_entities
+    return counter / len(text) 
 
 
 def stub_lexical_cohesion(text,nlp=None):
@@ -258,17 +264,6 @@ def stub_lexical_cohesion(text,nlp=None):
     # Lexical Tightness for mean value of Positiv Normalized Pointwise Mutual Information for all pairs of content-word tokens in text
     """
     return 0
-
-
-
-# NOTE : Might need to use something else for this, either NLTK or coreferee, by the same company that develops Spacy : https://github.com/explosion/coreferee
-def stub_coreference(text,nlp=None):
-    return 0
-
-def anaphoric_chain(text,nlp=None):
-    return 0
-
-
 
 # The following features were significant in Todirascu's paper but I don't quite know what they are.
 # This is syntactic transition type?

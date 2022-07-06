@@ -109,15 +109,21 @@ class Readability:
             fkgl=dict(function=self.fkgl,dependencies=[],default_arguments=dict()),
             smog=dict(function=self.smog,dependencies=[],default_arguments=dict()),
             rel=dict(function=self.rel,dependencies=[],default_arguments=dict()),
+
             pppl=dict(function=self.perplexity,dependencies=["GPT2_LM"],default_arguments=dict()),
-            dubois_buyse_ratio=dict(function=self.dubois_proportion,dependencies=["dubois_dataframe"],default_arguments=dict(filter_type="total",filter_value=None)),
+
             ttr=dict(function=self.ttr,dependencies=[],default_arguments=dict(formula_type = "default")),
             ntr=dict(function=self.ntr,dependencies=[],default_arguments=dict(formula_type = "default")),
+
+            dubois_buyse_ratio=dict(function=self.dubois_proportion,dependencies=["dubois_dataframe"],default_arguments=dict(filter_type="total",filter_value=None)),
             old20=dict(function=self.old20,dependencies=["lexique_dataframe"],default_arguments=dict()),
             pld20=dict(function=self.pld20,dependencies=["lexique_dataframe"],default_arguments=dict()),
+            
             cosine_similarity_tfidf=dict(function=self.lexical_cohesion_tfidf,dependencies=[],default_arguments=dict(mode="text")),
             cosine_similarity_LDA=dict(function=self.lexical_cohesion_LDA,dependencies=["fauconnier_model"],default_arguments=dict(mode="text")),
-            entity_density=dict(function=self.entity_density,dependencies=["coreferee"],default_arguments=dict(unique=False))
+            entity_density=dict(function=self.entity_density,dependencies=["coreferee"],default_arguments=dict(unique=False)),
+            referring_entity_ratio=dict(function=self.proportion_referring_entity,dependencies=["coreferee"],default_arguments=dict()),
+            avg_entity_word_length=dict(function=self.average_word_length_per_entity,dependencies=["coreferee"],default_arguments=dict())
             #following aren't 100% implemented yet
             #bert_value=dict(function=self.stub_BERT,dependencies=["BERT"]),
             #fasttext_value=dict(function=self.stub_fastText,dependencies=["fastText"]),
@@ -429,6 +435,18 @@ class Readability:
 
     def unique_entity_density(self,content):
         return self.entity_density(content=content,unique=True)
+
+    def proportion_referring_entity(self,content):
+        if not self.check_score_and_dependencies_available("referring_entity_ratio"):
+            raise RuntimeError("measure", "referring_entity_ratio", "cannot be calculated.")
+        func = discourse.proportion_referring_entity
+        return func(content,self.nlp)
+
+    def average_word_length_per_entity(self,content):
+        if not self.check_score_and_dependencies_available("avg_entity_word_length"):
+            raise RuntimeError("measure", "avg_entity_word_length", "cannot be calculated.")
+        func = discourse.average_word_length_per_entity
+        return func(content,self.nlp)
 
 
     # Measures obtained from Machine Learning models :

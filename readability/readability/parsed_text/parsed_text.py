@@ -273,4 +273,4 @@ class ParsedText:
     def lexical_cohesion_LDA(self ,mode="text", force=False):
         return self.call_score("cosine_similarity_LDA",[mode],force)
 
-    # NOTE: 
+        
