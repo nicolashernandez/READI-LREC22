@@ -26,6 +26,7 @@ class ParsedCollection:
         """
         self.readability_processor = readability_processor
         self.content = text_collection
+        self.corpus_name = "TO_BE_IMPLEMENTED"
 
         # Initialize scores by setting them all to None
         self.scores = dict()
@@ -290,3 +291,13 @@ class ParsedCollection:
     # NOTE: this seems to output the same values, whether we use text or lemmas, probably due to the type of model used.
     def lexical_cohesion_LDA(self ,mode="text", force=False):
         return self.call_score("cosine_similarity_LDA",[mode],force)
+
+    # Following functions are meant to be used with a corpus/collection of texts, while they could output a score such as mean accuracy,
+    # That would conflict with the scores that can be obtained with a text.. unless we do a corpus.informations attribute.. hmmm..
+    def classify_corpus_SVM(self):
+        return self.readability_processor.classify_corpus_SVM(self)
+    def classify_corpus_MLP(self):
+        return self.readability_processor.classify_corpus_MLP(self)
+    def compare_ML_models(self):
+        return self.readability_processor.compare_ML_models(self)
+

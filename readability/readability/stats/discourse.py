@@ -58,7 +58,6 @@ spacy_pronoun_tags = ["PRON", "PRP", "PRP$", "WP", "WP$", "PDAT", "PDS", "PIAT",
 DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
 
 # Pos-tag based features : 
-# TODO : make a wrapper | decorator to indicate that these do pretty much the same thing
 def nb_pronouns(text, nlp = None, mode="text"):
     """Returns the numbers of pronouns in a text, also available per sentence by giving the argument mode='sentence'"""
     # Pronoun tags available here, https://github.com/explosion/spaCy/blob/master/spacy/glossary.py
@@ -189,7 +188,7 @@ def average_cosine_similarity_LDA(model, text, nlp = None, mode="text"):
 # What is returned
 # doc.coref_chains is a chain holder, it's just a group of chains
 # doc.coref_chains[0] is a chain, it holds mentions, can also do X.most_specific_mention_index to get most relevant representation of entity
-# doc.coref_chains[0][0] is a mention, can hold multiple things in it (a composite mention like "Jane et son mari" would give [Jane,Mari])
+# doc.coref_chains[0][0] is a mention, can hold multiple things in it (a composite mention like "Jane et son mari" would give [Jane,mari])
 # It gives a token index so we can just do doc[doc.coref_chains[0][0].token_indexes[0]] to access the token and do spacy stuff
 # Of course this is a naive way that only works for mentions that refer to a singular entity.
 
@@ -199,8 +198,6 @@ def average_cosine_similarity_LDA(model, text, nlp = None, mode="text"):
 # So our developped method should consider sentence per sentence and try to figure out something.
 # But we'll develop that after the "basic" use of the previous
 
-# first n°32 and 33 : Number of entities per document normalized by number of words
-# And proportion of unique entities normalized by number of words.
 def entity_density(text,nlp=None,unique=False):
     """
     Entity density ~~ total|average number of all/unique entities in document
@@ -209,42 +206,42 @@ def entity_density(text,nlp=None,unique=False):
     doc = utils.convert_text_to_string(text)
 
     if unique:
-        #Number of chains ~~ Number of unique entities. Not exactly true.
+        #Number of chains ~~ Number of unique entities. Not exactly true since that won't include entities that only appear once.
         return len(nlp(doc)._.coref_chains) / len(text)
     else :
         counter = 0
+        # Number of entities == Number of every mention in chains.
         for chain in nlp(doc)._.coref_chains:
             counter += len(chain)
         return counter / len(text)
 
-# n°31 : Proportion of referring entities per document normalized by number of words :
 def proportion_referring_entity(text,nlp=None):
     doc = utils.convert_text_to_string(text)
+    doc = nlp(doc)
     counter = 0
-    for chain in nlp(doc)._.coref_chains:
+    for chain in doc._.coref_chains:
         counter += len(chain) - 1 # Remove initial appearence of entity when counting number of referring entities
-    counter = counter / len(nlp(doc)._.coref_chains) # Average over number of chains
-    # Not sure there's a need to normalize at the word level
+    counter = counter / len(doc._.coref_chains) # Average over number of chains
     return counter / len(text)
 
-# And 34 : Average number of words per entity normalized by number of words.
-# Problem is that coreferee only gives us one token per entity.. so things like New York will be shortened to New
-# If only I could combine merge_entities with this.. or... maybe i call merge entities on this then i use coreferee?
-# Nevermind, coreferee ignores merge_entities. 
-# And using spacy.ents only works for named entities. hmmm..
-# Perhaps I could get every index, check if one of them is the same as an ent.start in list of ents
-# If so, then get full size
+
+# NOTE: coreferee only gives us one token per entity, so things like New York will be shortened to New
+# Unfortunately, coreferee ignores the additional pipeline component 'merge_entities'.
+# A temporary solution is to use spacy.ents to get the full name of any recognized named entity.
 # However this won't work for not-named entities that are composite, like "cette femme".
+# I don't really understand the point of checking an entity's word length.
 def average_word_length_per_entity(text,nlp=None):
+    """"""
 
     doc = utils.convert_text_to_string(text)
     counter = 0
     entity_dict = dict()
     nb_entities = 0
-    for ent in nlp(doc).ents:
+    doc = nlp(doc)
+    for ent in doc.ents:
         entity_dict[ent.start] = len(ent.text.split())
 
-    for chain in nlp(doc)._.coref_chains:
+    for chain in doc._.coref_chains:
         for mention in chain:
             nb_entities = nb_entities + 1
             for index in mention.token_indexes:
@@ -256,6 +253,50 @@ def average_word_length_per_entity(text,nlp=None):
     # Average over number of entities
     counter = counter / nb_entities
     return counter / len(text) 
+
+# The next things : Co-reference chain properties.
+# Count types for each mention : indefinite NP, definite NP, proper names, personal pronouns, possessive determiners, demonstrative determiners,
+# reflexive pronouns, relative pronouns, NPs without a determiner, indefinite pronouns, demonstrative pronouns, average length of reference chain 
+
+# Additionally, check proportion of opening of chains where : indefinite NP, definite NP, proper names, NPs without a determiner, demonstrative NPs,
+# but also pronouns, (personal, demonstrative, indefinite, relative), possessives.
+
+# Also try to count both for : deictic pronouns | adverbs | resumptive pronouns | complex mentions (ohey i can actually do that one)
+
+def average_length_of_reference_chains(text, nlp=None):
+    doc = utils.convert_text_to_string(text)
+    doc = nlp(doc)
+    counter = 0
+    for chain in doc._.coref_chains:
+        counter += len(chain) # Get length of chain
+    counter = counter / len(doc._.coref_chains) # Average over number of chains
+    return counter
+
+#FIXME NOT DONE YET
+def count_type_mention(text, mention_type=None, nlp=None):
+    #ok so for each mention get the corresponding spacy thing and see what it is. hopefully it'll all be accounted for but we'll have to go one by one:
+    doc = utils.convert_text_to_string(text)
+    doc = nlp(doc)
+    counter = 0
+    # For each mention, get the index via mention.token_indexes. It's complex if nb_indexes > 1
+    for chain in doc._.coref_chains:
+        for mention in chain:
+            for index in mention.token_indexes:
+                print(doc[index].text,"pos:",doc[index].pos_,"morph:",doc[index].morph,"dep:",doc[index].dep_)
+    counter = counter / len(doc._.coref_chains) # Average over number of chains
+    return counter
+
+#FIXME NOT DONE YET
+def count_type_opening(text, mention_type=None, nlp=None):
+    doc = utils.convert_text_to_string(text)
+    doc = nlp(doc)
+    counter = 0
+    # For the first mention of each entity, get the index via mention.token_indexes. It's complex if nb_indexes > 1
+    for chain in doc._.coref_chains:
+        for index in chain[0].token_indexes:
+            print(doc[index].text,"pos:",doc[index].pos_,"morph:",doc[index].morph,"dep:",doc[index].dep_)
+    counter = counter / len(doc._.coref_chains) # Average over number of chains
+    return counter
 
 
 def stub_lexical_cohesion(text,nlp=None):

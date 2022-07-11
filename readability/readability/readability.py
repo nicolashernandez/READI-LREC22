@@ -87,20 +87,7 @@ class Readability:
         
         # Handling text that needs to be converted into lists of tokens
         self.content = utils.convert_text_to_sentences(content,self.nlp)
-
-        # Handling what is probably a corpus
-        # Reminder, structure needed is : dict => list of texts => list of sentences => list of words
-        # TODO : check this with a bunch of edge cases
-        #if type(content) == dict:
-        #    if isinstance(content[list(content.keys())[0]], list):
-        #        if isinstance(content[list(content.keys())[0]][0], list):
-        #            if isinstance(content[list(content.keys())[0]][0][0], list):
-        #                self.content_type = "corpus"
-        #                self.content = content
-        #                self.classes = list(content.keys())
-        #    #else, check if the structure is dict[class][text].. and tokenize everything (warn user it'll take some time)
-        #    #and then use that as the new structure
-        
+   
         # This dictionary associates values with the functions used to calculate them, alongside the dependencies needed.
         self.informations = dict(
             gfi=dict(function=self.gfi,dependencies=[],default_arguments=dict()),
@@ -123,11 +110,21 @@ class Readability:
             cosine_similarity_LDA=dict(function=self.lexical_cohesion_LDA,dependencies=["fauconnier_model"],default_arguments=dict(mode="text")),
             entity_density=dict(function=self.entity_density,dependencies=["coreferee"],default_arguments=dict(unique=False)),
             referring_entity_ratio=dict(function=self.proportion_referring_entity,dependencies=["coreferee"],default_arguments=dict()),
-            avg_entity_word_length=dict(function=self.average_word_length_per_entity,dependencies=["coreferee"],default_arguments=dict())
+            average_entity_word_length=dict(function=self.average_word_length_per_entity,dependencies=["coreferee"],default_arguments=dict()),
+            count_type_mention=dict(function=self.count_type_mention,dependencies=["coreferee"],default_arguments=dict(mention_type="proper_name")),
+            count_type_opening=dict(function=self.count_type_opening,dependencies=["coreferee"],default_arguments=dict(mention_type="proper_name"))
+            #indefinite NP, definite NP, proper names, personal pronouns, possessive determiners, demonstrative determiners,
+            # reflexive pronouns, relative pronouns, NPs without a determiner, indefinite pronouns, demonstrative pronouns,
+
             #following aren't 100% implemented yet
-            #bert_value=dict(function=self.stub_BERT,dependencies=["BERT"]),
-            #fasttext_value=dict(function=self.stub_fastText,dependencies=["fastText"]),
             #rsrs=dict(function=self.stub_rsrs,dependencies=["GPT2_LM"]),
+            
+            # These are meant to be used with a corpus only, so they should appear for a ParsedCollection instance, but not ParsedText.
+            #SVM_mean_accuracy=dict(function=self.classify_corpus_SVM,dependencies=[]),
+            #MLP_mean_accuracy=dict(function=self.classify_corpus_MLP,dependencies=[]),
+            #bert_metrics=dict(function=self.stub_BERT,dependencies=["BERT"]),
+            #fasttext_metrics=dict(function=self.stub_fastText,dependencies=["fastText"]),
+            
         )
         self.excluded_informations = dict()
 
@@ -159,8 +156,8 @@ class Readability:
         Creates a ParsedCollection instance that relies on the ReadabilityProcessor in order to output various readability measures.
         Currently, only three types of structures are accepted:
         A corpus-like dictionary that associates labels with texts. e.g : dict(class_1:{text1,text2},class_2:{text1,text2}).
-        A list of lists of texts. Will be given labels for compatibility with other functions.
-        A singular list of texts. Will be given a label for compatibility with other functions.
+        A list of lists of texts, given labels for compatibility with other functions.
+        A singular list of texts, given a label for compatibility with other functions.
         """
         # Structure is dictionary, try to adapt the structure to be : dict(class_1:{text1,text2},class_2{text1,text2}..)
         if isinstance(collection,dict):
@@ -198,7 +195,6 @@ class Readability:
         else:
             raise TypeError("Format of received collection not recognized, please give dict(class_name:{list(text)}) or list(list(text))")
 
-    #NOTE : maybe also provide load_dependency(self,value)
     def load(self,value):
         """Checks if a measure or value has been excluded, enables it and loads its dependencies if needed."""
         # Based on the value's name, check if exists in self.excluded_informations
@@ -284,34 +280,6 @@ class Readability:
         """Returns Reading Ease Level (Adaptation of FRE for french)"""
         return self.score("rel", content, statistics)
 
-    #TODO : repurpose this inside ParsedText as a traditional-only version (for reproducing the paper's contents)
-    # and a version with every available score
-    def scores(self):
-        """
-        Depending on type of content provided, returns a list of common readability scores (type=text),
-        or returns a matrix containing the mean values for these scores, depending on the classes of the corpus (type=corpus) 
-
-        :return: a pandas dataframe (or a list of scores)
-        :rtype: Union[pandas.core.frame.DataFrame,list] 
-        """
-        # NOTE : Need to rename this to something clearer, since we now have a method called "getScores"
-        # NOTE : Would be better to have this point to a scores_text() and scores_corpus(), which returns only one type.
-        # TODO : re-do this : show every available score if .compile() was done (and their pearson correlation)
-        # Semi-partial correlation should also be available, but ask user beforehand since might need time to recalculate.
-        if self.content_type == "corpus":
-            if hasattr(self, "corpus_statistics"):
-                return common_scores.traditional_scores(self.content, self.corpus_statistics)
-            else:
-                return common_scores.traditional_scores(self.content)
-
-        elif self.content_type == "text":
-            scores = ["gfi","ari","fre","fkgl","smog","rel"]
-            values = {}
-            for score in scores:
-                values[score] = self.score(score)
-            return values
-
-
     # Measures related to perplexity
     def perplexity(self,content):
         """
@@ -319,7 +287,7 @@ class Readability:
         Please refer to this paper for more details : https://doi.org/10.18653%252Fv1%252F2020.acl-main.240
 
         :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
-        :rtype: :rtype: Union[float,dict[str][list(float)]] 
+        :rtype: Union[float,dict[str][list(float)]] 
         """
         if not self.check_score_and_dependencies_available("pppl"):
             raise RuntimeError("measure 'pppl' cannot be calculated, please try ReadabilityProcessor.load('pppl') and try again.")
@@ -443,28 +411,72 @@ class Readability:
         return func(content,self.nlp)
 
     def average_word_length_per_entity(self,content):
-        if not self.check_score_and_dependencies_available("avg_entity_word_length"):
-            raise RuntimeError("measure", "avg_entity_word_length", "cannot be calculated.")
+        if not self.check_score_and_dependencies_available("average_entity_word_length"):
+            raise RuntimeError("measure", "average_entity_word_length", "cannot be calculated.")
         func = discourse.average_word_length_per_entity
         return func(content,self.nlp)
 
+    def count_type_mention(self,content,mention_type="proper_name"):
+        if not self.check_score_and_dependencies_available("count_type_mention"):
+            raise RuntimeError("measure", "count_type_mention", "cannot be calculated.")
+        func = discourse.count_type_mention
+        return func(content,mention_type,self.nlp)
 
+    def count_type_opening(self,content,mention_type="proper_name"):
+        if not self.check_score_and_dependencies_available("count_type_opening"):
+            raise RuntimeError("measure", "count_type_opening", "cannot be calculated.")
+        func = discourse.count_type_mention
+        return func(content,mention_type,self.nlp)
+
+    # NOTE: the following methods are intended to be used with a corpus
     # Measures obtained from Machine Learning models :
-    def stub_SVM():
-        #TODO: allow user to use default tf-idf matrix thing or with currently known features from other methods(common_scores text diversity, etc..)
-        return -1
+    # TODO: allow user to use default tf-idf matrix thing or with currently known features from other methods(common_scores text diversity, etc..)
+    def corpus_classify_ML(self,model_name,collection,plot=False):
+        if model_name == "SVM":
+            func = methods.classify_corpus_SVM
+        elif model_name == "MLP":
+            func = methods.classify_corpus_MLP
+        elif model_name == "compare":
+            func = methods.compare_models
 
-    def stub_MLP():
-        #TODO: allow user to use default tf-idf matrix thing or with currently known features from other methods(common_scores text diversity, etc..)
-        return -1
+        if isinstance(collection, parsed_collection.ParsedCollection):
+            return func(collection, plot)
+        else:
+            if isinstance(collection,dict):
+                return func(collection,plot)
+            elif isinstance(collection, list):
+                try:
+                    # Check if collection contains a list of texts or a list of lists of texts
+                    # This raises an exception if not applied on a text, which means that we're currently handling a list containing lists of texts
+                    utils.convert_text_to_string(collection[0])
+                except Exception:
+                    # Case with multiple lists of texts:
+                    counter = 0
+                    copy_collection = dict()
+                    for text_list in collection:
+                        copy_list = []
+                        for text in text_list:
+                            copy_list.append(text)
+                        copy_collection["label" + str(counter)] = copy_list
+                        counter +=1
+                    return func(copy_collection,plot)
+                else:
+                    raise TypeError("Cannot use a collection containing only one class for classification purposes, please try with something else.")
+        return None
 
-    def stub_compareModels():
-        #NOTE: this is probably not too high on the priority list of things to do.
-        return -1
+    def classify_corpus_SVM(self,collection,plot=False):
+        return self.corpus_classify_ML("SVM",collection,plot)
 
+    def classify_corpus_MLP(self,collection,plot=False):
+        return self.corpus_classify_ML("MLP",collection,plot)
 
+    def compare_ML_models(self,collection,plot=True):
+        return self.corpus_classify_ML("compare",collection,plot)
+
+    #TODO WHEN GET BACK : then take care of fasttext/bert, then do other stuff.
     # Measures obtained from Deep Learning models
     def stub_fastText():
+        func = fasttext.stub_fasttext
         return -1
         
     def stub_BERT():

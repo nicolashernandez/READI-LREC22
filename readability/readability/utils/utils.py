@@ -12,6 +12,7 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import torch
 from gensim.models import KeyedVectors
 from unidecode import unidecode
+from ..parsed_collection import parsed_collection
 
 
 # Note : remove this when we're done, this is just a quick dev workaround
@@ -104,6 +105,29 @@ def convert_text_to_sentences(text,nlp):
         text = ' '.join(text)
         text= [[token.text for token in sent] for sent in nlp(text).sents]
     return text
+
+def convert_corpus_to_list(corpus):
+    """Converts a dict[class][text][sentence][token] structure into list(str), also returning associated label in a list with same indexes."""
+    corpus_as_list=list()
+    labels = list()
+    if isinstance(corpus, parsed_collection.ParsedCollection):
+        for label in list(corpus.content.keys()):
+            for parsed_text in corpus.content[label]:
+                tex = []
+                labels.append(list(corpus.content.keys()).index(label))
+                for sentence in parsed_text.content:
+                    tex.extend(sentence)
+                corpus_as_list.append(tex)
+    else:
+        for level in corpus.keys():
+            for text in corpus[level]:
+                tex = []
+                labels.append(list(corpus.keys()).index(level))
+                for sent in text:
+                    for token in sent:
+                        tex.append(token.replace('\u200b',''))
+                corpus_as_list.append(tex)
+    return corpus_as_list, labels
 
 def group_words_in_sentences(text):
     doc = []

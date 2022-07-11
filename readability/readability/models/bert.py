@@ -1,5 +1,6 @@
 from . import models
 from ..utils import utils
+from ..parsed_collection import parsed_collection
 import random
 import csv
 import ktrain
@@ -144,14 +145,14 @@ def demo_doBert(name='ljl',test_flag = False):
             for cm in results:
                 cm_init += cm
             results_summary.append(cm_init)
-            models.pp.pprint(models.demo_compute_evaluation_metrics(cm_init,round=2, data_name=CORPUSNAME, class_names=class_names))
+            models.pp.pprint(models.compute_evaluation_metrics(cm_init,round=2, data_name=CORPUSNAME, class_names=class_names))
 
             
         print ('-------------------------------------------------------------')
         print ('total run', RUN, 'MODEL_NAME',MODEL_NAME)
         for i in range(len(corpusnames)):
             print ('CORPUSNAME', corpusnames[i], 'CORPUSNAME', corpusnames[i])
-            r = models.demo_compute_evaluation_metrics(results_summary[i],round=2, data_name=corpusnames[i], class_names=class_names_list[i])
+            r = models.compute_evaluation_metrics(results_summary[i],round=2, data_name=corpusnames[i], class_names=class_names_list[i])
             models.pp.pprint(r)
             print()
 
@@ -173,3 +174,71 @@ def demo_doBert(name='ljl',test_flag = False):
             print ('\t&'+'\t&'.join(line)+'\\\\')
             print()
     return 0
+
+def stub_BERT(corpus, model_name = "camembert-base"):
+    """Imports, configures, and trains a BERT model.
+    :param str model_name: Which corpus data to use for reproducing resultsn can be "ljl","bibebook.com","JeLisLibre", or "all"
+    :type name: str
+    :return: Nothing, it just prints the execution trace and a latex-usable table
+    :rtype: None
+    """
+    if isinstance(corpus, parsed_collection.ParsedCollection):
+        corpus_label_names = list(corpus.content.keys())
+    else:
+        corpus_label_names = list(corpus.keys())
+
+    #model_names = ['bert-base-multilingual-cased', 'camembert-base', 'flaubert/flaubert_base_cased']
+    model_names = ['camembert-base']
+
+    # PSEUDO CROSS VALIDATION by running several times the run and averaging the results
+    # if number_of_run = -1 then lr_find, and fit_onecycle(2e-5, 1), fit_onecycle(5e-5, 1)
+    number_of_run = 2
+
+    results_summary = list()
+
+    # FIXME get class names
+    #class_names =  corpus_label_names
+    # FIXME get the x train x test y train y test
+    x_train, x_test, y_train, y_test = demo_loadCorpusForTransformer(DATA_PATH)
+    # FIXME get the transformer with these things
+    print ('--> getTransformer')
+    t, trn, val, model, learner = demo_getTransformer(MODEL_NAME, x_train, y_train, x_test, y_test, corpus_label_names)
+
+    # EXPLORATION
+    #if number_of_run <0:
+    #    print ('--> lr_find')
+    #    learner.lr_find(show_plot=True, max_epochs=2)
+
+    #    print ('--> fit_onecycle 2.5')
+    #    learner.fit_onecycle(2e-5, 1) 
+    #    learner.validate(class_names=t.get_classes())
+
+    #    print ('--> fit_onecycle 5e-5')
+    #    learner.fit_onecycle(5e-5, 1) 
+    #    learner.validate(class_names=t.get_classes())
+
+    # PSEUDO CROSS VALIDATION by running n times the train/validation and resetting weights to avoid overfit
+    results = list()
+    init_weights = []
+    for layer in learner.model.layers:
+        init_weights.append(layer.get_weights()) # list of numpy arrays
+
+    for RUN in range(number_of_run):
+        print ('-------------------------------------------------------run', RUN)
+        for index in range(len(init_weights)):
+            learner.model.layers[index].set_weight(init_weights[index])
+        # train 
+        learner.autofit(0.0001)
+
+        # validate
+        results.append(learner.validate(class_names=corpus_label_names))
+
+    cm_init = [[0]*len(corpus_label_names)]*len(corpus_label_names)
+    for cm in results:
+        cm_init += cm
+    results_summary.append(cm_init)
+    r = models.compute_evaluation_metrics(cm_init,round=2, data_name="", class_names=corpus_label_names)
+
+    models.pp.pprint(r)
+
+    return r

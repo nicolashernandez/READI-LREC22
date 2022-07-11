@@ -40,9 +40,7 @@ def demo_get_labels(DATA_PATH):
   return list(set(labels))  
 
 
-
-
-def demo_compute_evaluation_metrics(cm, round = -1, data_name = '', class_names=''): 
+def compute_evaluation_metrics(cm, round = -1, data_name = '', class_names=''): 
   # ktrain learner.validate(class_names=class_names) return the confusion matrix
   # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.classification_report.html
   # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.precision_recall_fscore_support.html#sklearn.metrics.precision_recall_fscore_support
