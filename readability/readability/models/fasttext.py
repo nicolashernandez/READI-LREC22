@@ -6,10 +6,84 @@ import ktrain
 import os
 from ktrain import text
 
+
+def classify_corpus_fasttext(corpus, model_name = "fasttext"):
+    """Imports, configures, and trains a fastText model.
+    :param corpus: Data input, preferably as a dict(class_label:list(text))
+    :param str model_name: Choice of language model to use : fasttext, bigru, nbsvm
+    :return: Classification task metrics, as detailed in ..models.compute_evaluation_metrics() for more details
+    """
+    if isinstance(corpus, parsed_collection.ParsedCollection):
+        corpus_label_names = list(corpus.content.keys())
+    else:
+        corpus_label_names = list(corpus.keys())
+    results_summary = list()
+
+    # Uses the ktrain library to load the fastText model, then creates a learner object based on data split into train/test
+    NUM_WORDS = 50000
+    MAXLEN = 150
+    NGRAMS_SIZE = 1
+    x_train, y_train = utils.convert_corpus_to_list(corpus)
+
+    (x_train, y_train), (x_test, y_test), preproc = text.texts_from_array(x_train = x_train,
+                        y_train = y_train,
+                        class_names = corpus_label_names,
+                        max_features = NUM_WORDS, 
+                        maxlen = MAXLEN,
+                        ngram_range = NGRAMS_SIZE,
+                        val_pct = 0.1,
+                        preprocess_mode = 'standard', # default
+                        lang = "fr",
+                        random_state = 2
+                        )
+    # Build and return a text classification model https://amaiya.github.io/ktrain/text/index.html#ktrain.text.text_classifier
+    if model_name == "fasttext":
+        model = text.text_classifier('fasttext', (x_train, y_train), preproc=preproc)
+    elif model_name == "bigru":
+        model = text.text_classifier('bigru', (x_train, y_train), preproc=preproc)
+    elif model_name == "nbsvm":
+        model = text.text_classifier('nbsvm', (x_train, y_train), preproc=preproc)
+
+    # Returns a Learner instance that can be used to tune and train Keras models https://amaiya.github.io/ktrain/index.html#ktrain.get_learner
+    learner = ktrain.get_learner(model, train_data=(x_train, y_train), val_data=(x_test, y_test))
+
+    # Pseudo cross-validation by running n times the train/validation and resetting weights to its initial configuration
+    # Could be improved by recreating the learner instance by manually splitting train/test properly instead of re-using same configuration
+    runs = 5
+    results = list()
+
+    init_weights = []
+    for layer in learner.model.layers:
+        init_weights.append(layer.get_weights()) # list of numpy arrays
+
+    for RUN in range(runs):
+        print ('-------------------------------------------------------run', RUN)
+        # Properly reset the model's weights for a true cross-validation instead on fitting after its iterations
+        for index in range(len(init_weights)):
+            learner.model.layers[index].set_weights(init_weights[index])
+        # train 
+        learner.autofit(0.0001)
+        # validate
+        results.append(learner.validate(class_names=corpus_label_names))
+
+    cm_init = [[0]*len(corpus_label_names)]*len(corpus_label_names)
+    #return results
+    for cm in results:
+        cm_init += cm
+    results_summary.append(cm_init)
+
+
+    r = models.compute_evaluation_metrics(results_summary[0],round=2, data_name="", class_names=corpus_label_names)
+    models.pp.pprint(r)
+
+    return r
+
+# -------------------- Ignore these, only used for reproducing READI paper contents -------------------
+
 DATA_ENTRY_POINT = utils.DATA_ENTRY_POINT
 
 def demo_getFastText(DATA_PATH, class_names):
-    """Uses the ktrain library to load the fastText model, then creates a learner object based on data split into train/test"""
+    """Uses the ktrain library to load the fastText model, then creates a learner object with random test/train split based on csv file contents"""
     NUM_WORDS = 50000
     MAXLEN = 150
     #NGRAMS_SIZE = 1 # 8 minutes avec 2
@@ -30,14 +104,13 @@ def demo_getFastText(DATA_PATH, class_names):
     #model = text.text_classifier('bigru', (x_train, y_train), preproc=preproc)
     #model = text.text_classifier('nbsvm', (x_train, y_train), preproc=preproc)
 
-    # Returns a Learner instance that can be used to tune and train Keras models https://amaiya.github.io/ktrain/index.html#ktrain.get_learner
     learner = ktrain.get_learner(model, train_data=(x_train, y_train), val_data=(x_test, y_test))
     return (x_train, y_train), (x_test, y_test), preproc, model, learner
 
 def demo_doFastText(name='ljl',test_flag = False):
     """Imports, configures, and trains the fastText model used in our paper.
     This method also prints the results in a latex-usable format, within the tabular tag.
-    :param name: Which corpus data to use for reproducing resultsn can be "ljl","bibebook.com","JeLisLibre", or "all"
+    :param name: Which corpus data to use for reproducing results, can be "ljl","bibebook.com","JeLisLibre", or "all"
     :type name: str
     :return: Nothing, it just prints the execution trace and a latex-usable table
     :rtype: None
@@ -119,83 +192,9 @@ def demo_checkLR(name='ljl'):
     DATA_PATH = os.path.join(DATA_ENTRY_POINT,name)+ '_hotvector.csv'
   
     class_names =  models.demo_get_csv_fieldnames(DATA_PATH)[2:]
-    print (class_names)    
+    print(class_names)    
 
     (x_train, y_train), (x_test, y_test), preproc, model, learner = demo_getFastText(DATA_PATH, class_names=class_names)
 
     learner.lr_find()
     learner.lr_plot()
-
-def stub_fasttext(corpus, model_name = "fasttext"):
-    """Imports, configures, and trains a fastText model.
-    :param corpus: Data input, preferably as a dict(class_label:list(text))
-    :param str model_name: Choice of language model to use : fasttext, bigru, nbsvm
-    :return: Nothing, it just prints the execution trace and a latex-usable table
-    :rtype: None
-    """
-    if isinstance(corpus, parsed_collection.ParsedCollection):
-        corpus_label_names = list(corpus.content.keys())
-    else:
-        corpus_label_names = list(corpus.keys())
-    results_summary = list()
-
-    # Uses the ktrain library to load the fastText model, then creates a learner object based on data split into train/test
-    NUM_WORDS = 50000
-    MAXLEN = 150
-    NGRAMS_SIZE = 1
-    x_train, y_train = utils.convert_corpus_to_list(corpus)
-
-    (x_train, y_train), (x_test, y_test), preproc = text.texts_from_array(x_train = x_train,
-                        y_train = y_train,
-                        class_names = corpus_label_names,
-                        max_features = NUM_WORDS, 
-                        maxlen = MAXLEN,
-                        ngram_range = NGRAMS_SIZE,
-                        val_pct = 0.1, # if None, 10% of data will be used for validation
-                        preprocess_mode = 'standard', # default
-                        lang = "fr",
-                        random_state = 2
-                        )
-    # Build and return a text classification model https://amaiya.github.io/ktrain/text/index.html#ktrain.text.text_classifier
-    if model_name == "fasttext":
-        model = text.text_classifier('fasttext', (x_train, y_train), preproc=preproc)
-    elif model_name == "bigru":
-        model = text.text_classifier('bigru', (x_train, y_train), preproc=preproc)
-    elif model_name == "nbsvm":
-        model = text.text_classifier('nbsvm', (x_train, y_train), preproc=preproc)
-
-    # Returns a Learner instance that can be used to tune and train Keras models https://amaiya.github.io/ktrain/index.html#ktrain.get_learner
-    learner = ktrain.get_learner(model, train_data=(x_train, y_train), val_data=(x_test, y_test))
-
-    # Cross validation by running n times the train/validation and resetting weights to its initial configuration
-    runs = 5
-    results = list()
-
-    init_weights = []
-    for layer in learner.model.layers:
-        init_weights.append(layer.get_weights()) # list of numpy arrays
-
-    for RUN in range(runs):
-        print ('-------------------------------------------------------run', RUN)
-        # Properly reset the model's weights for a true cross-validation instead on fitting after its iterations
-        for index in range(len(init_weights)):
-            learner.model.layers[index].set_weights(init_weights[index])
-        # train 
-        learner.autofit(0.0001)
-        # validate
-        results.append(learner.validate(class_names=corpus_label_names))
-
-    # that's a confusion matrix i think
-    cm_init = [[0]*len(corpus_label_names)]*len(corpus_label_names)
-    #return results
-    for cm in results:
-        cm_init += cm
-        print(--------------------------cm)
-        print(cm)
-    results_summary.append(cm_init)
-
-
-    r = models.compute_evaluation_metrics(results_summary[0],round=2, data_name="", class_names=corpus_label_names)
-    models.pp.pprint(r)
-
-    return r

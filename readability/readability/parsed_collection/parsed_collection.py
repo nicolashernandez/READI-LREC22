@@ -301,3 +301,8 @@ class ParsedCollection:
     def compare_ML_models(self):
         return self.readability_processor.compare_ML_models(self)
 
+    def classify_corpus_fasttext(self):
+        return self.readability_processor.classify_corpus_fasttext(self)
+    def classify_corpus_BERT(self):
+        return self.readability_processor.classify_corpus_BERT(self)
+

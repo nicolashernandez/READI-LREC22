@@ -122,8 +122,8 @@ class Readability:
             # These are meant to be used with a corpus only, so they should appear for a ParsedCollection instance, but not ParsedText.
             #SVM_mean_accuracy=dict(function=self.classify_corpus_SVM,dependencies=[]),
             #MLP_mean_accuracy=dict(function=self.classify_corpus_MLP,dependencies=[]),
-            #bert_metrics=dict(function=self.stub_BERT,dependencies=["BERT"]),
-            #fasttext_metrics=dict(function=self.stub_fastText,dependencies=["fastText"]),
+            #bert_metrics=dict(function=self.classify_corpus_BERT,dependencies=["BERT"]),
+            #fasttext_metrics=dict(function=self.classify_corpus_fasttext,dependencies=["fastText"]),
             
         )
         self.excluded_informations = dict()
@@ -464,20 +464,21 @@ class Readability:
                     raise TypeError("Cannot use a collection containing only one class for classification purposes, please try with something else.")
         return None
 
-    def classify_corpus_SVM(self,collection,plot=False):
+    def classify_corpus_SVM(self ,collection, plot=False):
         return self.corpus_classify_ML("SVM",collection,plot)
 
-    def classify_corpus_MLP(self,collection,plot=False):
+    def classify_corpus_MLP(self, collection, plot=False):
         return self.corpus_classify_ML("MLP",collection,plot)
 
-    def compare_ML_models(self,collection,plot=True):
+    def compare_ML_models(self, collection, plot=True):
         return self.corpus_classify_ML("compare",collection,plot)
 
     #TODO WHEN GET BACK : then take care of fasttext/bert, then do other stuff.
     # Measures obtained from Deep Learning models
-    def stub_fastText():
-        func = fasttext.stub_fasttext
-        return -1
+    def classify_corpus_fasttext(self, collection, model_name = "fasttext"):
+        func = fasttext.classify_corpus_fasttext
+        return func(collection, model_name)
         
-    def stub_BERT():
-        return -1
+    def classify_corpus_BERT(self, collection, model_name = "camembert-base"):
+        func = bert.classify_corpus_BERT
+        return func(collection, model_name)
