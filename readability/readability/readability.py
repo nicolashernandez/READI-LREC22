@@ -257,27 +257,51 @@ class Readability:
             return func(content)
         
     def gfi(self, content, statistics = None):
-        """Returns Gunning Fog Index"""
+        """
+        Outputs the Gunning fog index, a 1952 readability test estimating the years of formal education needed to understand a text on the first reading.
+        The scale goes from 6 to 18, starting at the sixth grade in the United States.
+        The formula is : 0.4 * ( (words/sentences) + 100 * (complex words / words) )
+        """
         return self.score("gfi", content, statistics)
 
     def ari(self, content, statistics = None):
-        """Returns Automated Readability Index"""
+        """
+        Outputs the Automated readability index, a 1967 readability test estimating the US grade level needed to comprehend a text
+        The scale goes from 1 to 14, corresponding to age 5 to 18.
+        The formula is 4.71 * (characters / words) + 0.5 (words / sentences) - 21.43
+        """
         return self.score("ari", content, statistics)
 
     def fre(self, content, statistics = None):
-        """Returns Flesch Reading Ease"""
+        """
+        Outputs the Flesch reading ease, a 1975 readability test estimating the US school level needed to comprehend a text
+        The scale goes from 100 to 0, corresponding to Grade 5 at score 100, up to post-college below score 30.
+        The formula is 206.835 - 1.015 * (total words / total sentences) - 84.6 * (total syllables / total words)
+        """
         return self.score("fre", content, statistics)
 
     def fkgl(self, content, statistics = None):
-        """Returns Flesch–Kincaid Grade Level"""
+        """
+        Outputs the Flesch–Kincaid grade level, a 1975 readability test estimating the US grade level needed to comprehend a text
+        The scale is meant to be a one to one representation, a score of 5 means that the text should be appropriate for fifth graders.
+        The formula is 0.39 * (total words / total sentences)+11.8*(total syllables / total words) - 15.59
+        """
         return self.score("fkgl", content, statistics)
 
     def smog(self, content, statistics = None):
-        """Returns Simple Measure of Gobbledygook"""
+        """
+        Outputs the Simple Measure of Gobbledygook, a 1969 readability test estimating the years of education needed to understand a text
+        The scale is meant to be a one to one representation, a score of 5 means that the text should be appropriate for fifth graders.
+        The formula is 1.043 * Square root (Number of polysyllables * (30 / number of sentences)) + 3.1291
+        """
         return self.score("smog", content, statistics)
 
     def rel(self, content, statistics = None):
-        """Returns Reading Ease Level (Adaptation of FRE for french)"""
+        """
+        Outputs the Reading Ease Level, an adaptation of Flesch's reading ease for the French language,
+        with changes to the coefficients taking into account the difference in length between French and English words.
+        The formula is 207 - 1.015 * (Number of words / Number of sentences) - 73.6 * (Number of syllables / Number of words)
+        """
         return self.score("rel", content, statistics)
 
     # Measures related to perplexity
@@ -287,7 +311,7 @@ class Readability:
         Please refer to this paper for more details : https://doi.org/10.18653%252Fv1%252F2020.acl-main.240
 
         :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
-        :rtype: Union[float,dict[str][list(float)]] 
+        :rtype: float
         """
         if not self.check_score_and_dependencies_available("pppl"):
             raise RuntimeError("measure 'pppl' cannot be calculated, please try ReadabilityProcessor.load('pppl') and try again.")

@@ -26,7 +26,7 @@ class ParsedCollection:
         """
         self.readability_processor = readability_processor
         self.content = text_collection
-        self.corpus_name = "TO_BE_IMPLEMENTED"
+        self.corpus_name = "unused"
 
         # Initialize scores by setting them all to None
         self.scores = dict()
@@ -83,7 +83,6 @@ class ParsedCollection:
         :return: a corpus, in a specific format where texts are represented as lists of sentences, which are lists of words.
         :rtype: dict[str][str][str][str]
         """
-        #I can get the moy no problem, but I do need the stddev. eh
         texts = self.content
         moy = list(self.call_score(score_type).values())
 
@@ -108,16 +107,9 @@ class ParsedCollection:
                 corpus_no_outliers[label].pop(index - offset)
                 offset += 1
             print("New number of texts for class", label, ":", len(corpus_no_outliers[label]))
-        print("In order to use this new corpus, you'll have to make a new Readability instance.")
-
-        #So.. we have a dictionary associating labels and ParsedTexts. need to make an import function in Readability I suppose.
-        # Or do that now.
-        #Some of the values have to be re-calculated though..
-        #Not the ones within the ParsedTexts themselves, but the ones in ParsedCollection..
-        #Or I can just re-init a new CorpusCollection instance. yeah. it does the init stuff, values of texts are known, but corpus specific values aren't.
         return ParsedCollection(corpus_no_outliers,self.readability_processor)
 
-    def call_score(self,score_name, arguments=None, force=False):
+    def call_score(self,score_name, arguments=None, force=False, iterable_arguments=None):
         """
         Helper function that gets a score if it already exists, otherwise checks if it's available, if so call the relevant function from the ReadabilityProcessor
         Use of function is : instance.call_score("score_name", arguments:[arg1,arg2,argi..], force:bool)
@@ -136,8 +128,14 @@ class ParsedCollection:
             elif self.readability_processor.check_score_and_dependencies_available(score_name):
                 #Otherwise, get it if ParsedText items already calculated it, or get them to calculate it.
                 moy = 0
-                for text in self.content[label]:
-                    moy += text.call_score(score_name, arguments, force)
+                if iterable_arguments is None:
+                    for text in self.content[label]:
+                        moy += text.call_score(score_name,arguments,force)
+                else:
+                    for index,text in enumerate(self.content[label]):
+                        # Append every ith iterable argument to the permanent arguments (even if none are supplied)
+                        # NOTE: this breaks if arguments is None, remember to supply an empty list instead.
+                        moy += text.call_score(score_name,arguments + list(list(zip(*iterable_arguments))[index]),force)
                 self.scores[score_name][label] = moy / len(self.content[label])
                 moy_score[label] = self.scores[score_name][label]
             else:
@@ -179,58 +177,69 @@ class ParsedCollection:
     
 
     # Traditional measures :
-    def traditional_score(self,score_name):
-        # NOTE: don't use self.call_score for this one, the reference to ParsedText.call_score prevents using ParsedText.statistics as a speed-up.
-        # Since the functions share the same name, there probably exists a way to "access" the .traditional_score() method of ParsedText instead of
-        # knowning how to get ReadabilityProcessor.score(), which is less useful.
-        moy_score = dict()
-        # Check if scores exist, otherwise calculate 
+    def traditional_score(self,score_name, force=False):
+        text_statistics = [[]]
         for label in list(self.content.keys()):
-            if self.scores[score_name][label] == None:
-                # Get every ParsedText score (or let them calculate it)
-                moy = 0
-                for text in self.content[label]:
-                    moy += text.traditional_score(score_name)
-                self.scores[score_name][label] = moy / len(self.content[label])
-                moy_score[label] = self.scores[score_name][label]
-            else:
-                # Just get the score
-                moy_score[label] = self.scores[score_name][label]
-        # TODO : Add pearson coefficients too. According to stats/common_scores, need to flatten each text into a list, and have a list of labels with corresponding indexes.
-        # Should be quick to reproduce
-        return moy_score
+            for parsed_text in self.content[label]:
+                text_statistics[0].append(parsed_text.statistics)
+
+        return self.call_score(score_name,arguments=[],force=force,iterable_arguments=text_statistics)
     
-    def gfi(self):
-        """Returns Gunning Fog Index"""
+    def gfi(self, force=False):
+        """
+        Outputs the Gunning fog index, a 1952 readability test estimating the years of formal education needed to understand a text on the first reading.
+        The scale goes from 6 to 18, starting at the sixth grade in the United States.
+        The formula is : 0.4 * ( (words/sentences) + 100 * (complex words / words) )
+        """
         return self.traditional_score("gfi")
 
-    def ari(self):
-        """Returns Automated Readability Index"""
+    def ari(self, force=False):
+        """
+        Outputs the Automated readability index, a 1967 readability test estimating the US grade level needed to comprehend a text
+        The scale goes from 1 to 14, corresponding to age 5 to 18.
+        The formula is 4.71 * (characters / words) + 0.5 (words / sentences) - 21.43
+        """
         return self.traditional_score("ari")
 
-    def fre(self):
-        """Returns Flesch Reading Ease"""
+    def fre(self, force=False):
+        """
+        Outputs the Flesch reading ease, a 1975 readability test estimating the US school level needed to comprehend a text
+        The scale goes from 100 to 0, corresponding to Grade 5 at score 100, up to post-college below score 30.
+        The formula is 206.835 - 1.015 * (total words / total sentences) - 84.6 * (total syllables / total words)
+        """
         return self.traditional_score("fre")
 
-    def fkgl(self):
-        """Returns Flesch–Kincaid Grade Level"""
+    def fkgl(self, force=False):
+        """
+        Outputs the Flesch–Kincaid grade level, a 1975 readability test estimating the US grade level needed to comprehend a text
+        The scale is meant to be a one to one representation, a score of 5 means that the text should be appropriate for fifth graders.
+        The formula is 0.39 * (total words / total sentences)+11.8*(total syllables / total words) - 15.59
+        """
         return self.traditional_score("fkgl")
 
-    def smog(self):
-        """Returns Simple Measure of Gobbledygook"""
+    def smog(self, force=False):
+        """
+        Outputs the Simple Measure of Gobbledygook, a 1969 readability test estimating the years of education needed to understand a text
+        The scale is meant to be a one to one representation, a score of 5 means that the text should be appropriate for fifth graders.
+        The formula is 1.043 * Square root (Number of polysyllables * (30 / number of sentences)) + 3.1291
+        """
         return self.traditional_score("smog")
 
-    def rel(self):
-        """Returns Reading Ease Level (Adaptation of FRE for french)"""
+    def rel(self, force=False):
+        """
+        Outputs the Reading Ease Level, an adaptation of Flesch's reading ease for the French language,
+        with changes to the coefficients taking into account the difference in length between French and English words.
+        The formula is 207 - 1.015 * (Number of words / Number of sentences) - 73.6 * (Number of syllables / Number of words)
+        """
         return self.traditional_score("rel")
 
 
     # Measures related to perplexity
     def perplexity(self,force=False):
-        return self.call_score("pppl",[], force)
+        return self.call_score("pppl",[],force)
     
     def stub_rsrs(self,force=False):
-        return self.call_score("rsrs",[], force)
+        return self.call_score("rsrs",[],force)
 
 
     # Measures related to text diversity

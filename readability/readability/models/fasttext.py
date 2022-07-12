@@ -9,6 +9,7 @@ from ktrain import text
 
 def classify_corpus_fasttext(corpus, model_name = "fasttext"):
     """Imports, configures, and trains a fastText model.
+
     :param corpus: Data input, preferably as a dict(class_label:list(text))
     :param str model_name: Choice of language model to use : fasttext, bigru, nbsvm
     :return: Classification task metrics, as detailed in ..models.compute_evaluation_metrics() for more details
@@ -48,7 +49,7 @@ def classify_corpus_fasttext(corpus, model_name = "fasttext"):
     learner = ktrain.get_learner(model, train_data=(x_train, y_train), val_data=(x_test, y_test))
 
     # Pseudo cross-validation by running n times the train/validation and resetting weights to its initial configuration
-    # Could be improved by recreating the learner instance by manually splitting train/test properly instead of re-using same configuration
+    # NOTE: True cross-validation can be done by recreating the learner instance with manual train/test split instead of just resetting weights.
     runs = 5
     results = list()
 
@@ -71,7 +72,6 @@ def classify_corpus_fasttext(corpus, model_name = "fasttext"):
     for cm in results:
         cm_init += cm
     results_summary.append(cm_init)
-
 
     r = models.compute_evaluation_metrics(results_summary[0],round=2, data_name="", class_names=corpus_label_names)
     models.pp.pprint(r)
@@ -99,11 +99,8 @@ def demo_getFastText(DATA_PATH, class_names):
                         ngram_range=NGRAMS_SIZE,
                         preprocess_mode='standard' # default
                         )
-    # Build and return a text classification model https://amaiya.github.io/ktrain/text/index.html#ktrain.text.text_classifier
-    model = text.text_classifier('fasttext', (x_train, y_train), preproc=preproc)
-    #model = text.text_classifier('bigru', (x_train, y_train), preproc=preproc)
-    #model = text.text_classifier('nbsvm', (x_train, y_train), preproc=preproc)
 
+    model = text.text_classifier('fasttext', (x_train, y_train), preproc=preproc)
     learner = ktrain.get_learner(model, train_data=(x_train, y_train), val_data=(x_test, y_test))
     return (x_train, y_train), (x_test, y_test), preproc, model, learner
 

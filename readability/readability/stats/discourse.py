@@ -172,32 +172,7 @@ def average_cosine_similarity_LDA(model, text, nlp = None, mode="text"):
 
     return average_cosine_similarity
 
-# Things that can be done with coreferee :
-# First off : need to downgrade spacy and the model from 3.3.0 to 3.2.0 due to compatibility issues. Oh well.
-# Next, how to use :
-# put coreferee in setup.cfg
-# do python3 -m coreferee install fr (figure out how to do that from within script or within setup.cfg or elsewhere)
-
-# nlp = spacy.load("fr_core_news_sm")
-# nlp.add_pipe("coreferee")
-
-# doc = nlp("Même si elle était très occupée par son travail, Julie en avait marre. Alors, elle et son mari décidèrent qu'ils avaient besoin de vacances. Ils allèrent en Espagne car ils adoraient le pays)
-
-# Can use doc._.coref_chains to get the following :
-
-# What is returned
-# doc.coref_chains is a chain holder, it's just a group of chains
-# doc.coref_chains[0] is a chain, it holds mentions, can also do X.most_specific_mention_index to get most relevant representation of entity
-# doc.coref_chains[0][0] is a mention, can hold multiple things in it (a composite mention like "Jane et son mari" would give [Jane,mari])
-# It gives a token index so we can just do doc[doc.coref_chains[0][0].token_indexes[0]] to access the token and do spacy stuff
-# Of course this is a naive way that only works for mentions that refer to a singular entity.
-
-# Important note : Using only this won't be able to get the features noted in 3. entity cohesion with the transitions 
-# aka "subject to subject" where X is a subject in sentence n, and the reference to X in sentence n+1 is also a subject.
-# these can take value subject, object, other, or none (when does not appear)
-# So our developped method should consider sentence per sentence and try to figure out something.
-# But we'll develop that after the "basic" use of the previous
-
+# Things that can be done with coreferee for features based on coreference chains. :
 def entity_density(text,nlp=None,unique=False):
     """
     Entity density ~~ total|average number of all/unique entities in document
@@ -229,7 +204,6 @@ def proportion_referring_entity(text,nlp=None):
 # Unfortunately, coreferee ignores the additional pipeline component 'merge_entities'.
 # A temporary solution is to use spacy.ents to get the full name of any recognized named entity.
 # However this won't work for not-named entities that are composite, like "cette femme".
-# I don't really understand the point of checking an entity's word length.
 def average_word_length_per_entity(text,nlp=None):
     """"""
 
@@ -282,7 +256,8 @@ def count_type_mention(text, mention_type=None, nlp=None):
     for chain in doc._.coref_chains:
         for mention in chain:
             for index in mention.token_indexes:
-                print(doc[index].text,"pos:",doc[index].pos_,"morph:",doc[index].morph,"dep:",doc[index].dep_)
+                #print(doc[index].text,"pos:",doc[index].pos_,"morph:",doc[index].morph,"dep:",doc[index].dep_)
+                counter +=1
     counter = counter / len(doc._.coref_chains) # Average over number of chains
     return counter
 
@@ -294,7 +269,8 @@ def count_type_opening(text, mention_type=None, nlp=None):
     # For the first mention of each entity, get the index via mention.token_indexes. It's complex if nb_indexes > 1
     for chain in doc._.coref_chains:
         for index in chain[0].token_indexes:
-            print(doc[index].text,"pos:",doc[index].pos_,"morph:",doc[index].morph,"dep:",doc[index].dep_)
+            #print(doc[index].text,"pos:",doc[index].pos_,"morph:",doc[index].morph,"dep:",doc[index].dep_)
+            counter +=1
     counter = counter / len(doc._.coref_chains) # Average over number of chains
     return counter
 
@@ -310,7 +286,14 @@ def stub_lexical_cohesion(text,nlp=None):
 # This is syntactic transition type?
 def distance_object_to_none(text,nlp = None):
     """
-    # Object to None : distance between 2 consecutive mentions of same chain is larger than 1 sentence.
+    Object to None : distance between 2 consecutive mentions of same chain is larger than 1 sentence.
+    First, get coreference chains on entire text:
+    Then divide text into sentences
+    Associate each mention into its sentence thanks to doc._.coref_chains[][].token_indexes
+    Get the most "relevant" mention per sentence thanks to sentence._.most_relevant_thing (i forgot the actual name, do a .__dict__ to see)
+    Then check the type between each mention of specific entities. (or if it doesn't appear in adjacent sentences => X to None)
+    Remember to NOT recreate a doc by doing sentence = nlp(sentence) because the lack of context will remove certain entities.
+    Instead manually recreate the ChainHolder items by subsetting.
     """
     return 0
 

@@ -23,7 +23,7 @@ def classify_corpus_BERT(corpus, model_name = "camembert-base", percent_train=90
     results_summary = list()
     x, y = utils.convert_corpus_to_list(corpus)
 
-    # Need to de-tokenize texts since it's better to let the transformers model do it themselves.
+    # Need to de-tokenize texts, and probably better to let the transformer model do it itself.
     for index,text in enumerate(x):
         x[index] = " ".join(text)
 
@@ -40,7 +40,7 @@ def classify_corpus_BERT(corpus, model_name = "camembert-base", percent_train=90
     y_train = y[:len_train]
     y_test = y[len_train:]
     # Load transformer model 
-    print ('--> getTransformer')
+    print ('Loading transformer model..')
     t, trn, val, model, learner = getTransformer(model_name, x_train, y_train, x_test, y_test, corpus_label_names, batch_size = 32)
 
     # EXPLORATION
@@ -91,7 +91,7 @@ def getTransformer(model_name, x_train, y_train, x_test, y_test, class_names, ba
                         )
     trn = t.preprocess_train(x_train, y_train)
     val = t.preprocess_test(x_test, y_test)
-    model = t.get_classifier() #model (Model): A Keras Model instance
+    model = t.get_classifier()
     learner = ktrain.get_learner(model, train_data=trn, val_data=val, batch_size=batch_size)
     return t, trn, val, model, learner
 
@@ -126,14 +126,6 @@ def demo_doBert(name='ljl',test_flag = False):
     :return: Nothing, it just prints the execution trace and a latex-usable table
     :rtype: None
     """
-    #MODEL_NAME = 'distilbert-base-uncased'
-    #MODEL_NAME = 'camembert-base'# https://huggingface.co/camembert-base ; https://camembert-model.fr/
-    #MODEL_NAME = 'flaubert/flaubert_base_cased' # https://huggingface.co/flaubert/flaubert_base_cased
-    # https://discuss.huggingface.co/t/helsinki-nlp-opus-mt-en-fr-missing-tf-model-h5-file/13467/3
-    # 404 Client Error: Not Found for url: https://huggingface.co/flaubert/flaubert_base_cased/resolve/main/tf_model.h5
-    # bert https://github.com/amaiya/ktrain/blob/master/ktrain/text/models.py
-    #MODEL_NAME = 'bert-base-multilingual-cased' # https://huggingface.co/bert-base-multilingual-cased ; https://github.com/deepset-ai/bert-tensorflow/blob/master/samples/bert_config.json
-    #MODEL_NAME = 'bert-base-cased'
 
     corpusnames = ['ljl']
     if name == 'all':

@@ -41,8 +41,6 @@ class ParsedText:
         :param readability_processor: Type of processor to use for the calculation of pseudo-perplexity
         :type readability_processor: ReadabilityProcessor
         """
-        # NOTE: Maybe I should keep the str and list(str) variants of the text content stored in .statistics in order to re-use it later
-        # Instead of potentially converting from sentences to text or from text to sentences several times.
         self.readability_processor = readability_processor
 
         # Converting text into a list(list(str)) format in order to properly seperate sentences and tokens.
@@ -55,6 +53,7 @@ class ParsedText:
         for info in list(readability_processor.excluded_informations.keys()):
             self.scores[info] = None
 
+        # Calculate common statistics that can be used as part of more complex features.
         self.statistics = dict()
         self.statistics["totalWords"] = 0
         self.statistics["totalLongWords"] = 0
@@ -75,13 +74,11 @@ class ParsedText:
             
     
     def show_text(self):
+        """Prints to the console the text itself."""
         return utils.convert_text_to_string(self.content)
 
     def show_statistics(self):
-        """
-        Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.
-        In this case, this will output the mean values of each score for each class.
-        """
+        """Prints to the console the contents of the statistics obtained for a text."""
         for stat in list(self.statistics.keys()):
             print(stat, "=", self.statistics[stat])
         return None
@@ -89,7 +86,7 @@ class ParsedText:
     def call_score(self, score_name, arguments=None, force=False):
         """
         Helper function that gets a score if it already exists, otherwise checks if it's available, if so call the relevant function from the ReadabilityProcessor
-        Use of function is : instance.call_score("score_name", arguments:[arg1,arg2,argi..], force:bool)
+        Use of function is : instance.call_score(score_name:str, arguments:list(argi), force:bool)
         If the underlying function needs no additional arguments, just pass en empty list, e.g : instance.call_score("pppl",[],True)
 
         :param str score_name: Name of a score recognized by ReadabilityProcessor.informations.
@@ -101,7 +98,7 @@ class ParsedText:
             return self.scores[score_name]
         # otherwise check if score_name is available in processor:
         elif self.readability_processor.check_score_and_dependencies_available(score_name):
-            # If so, then call function based on informations
+            # If so, then call function based on informations and provided arguments (if any)
             func = self.readability_processor.informations[score_name]["function"]
             if arguments is None:
                 arguments = self.readability_processor.informations[score_name]["default_arguments"].values()
@@ -129,6 +126,10 @@ class ParsedText:
         df = pd.DataFrame(df)
         return df
 
+    def show_possible_scores(self):
+        """Prints currently 'available' scores in a list"""
+        return list(self.scores.keys())
+
     # Traditional measures
     
     def traditional_score(self,score_name,force=False):
@@ -141,27 +142,51 @@ class ParsedText:
         return self.call_score(score_name,[self.statistics],force)
 
     def gfi(self):
-        """Returns Gunning Fog Index"""
+        """
+        Outputs the Gunning fog index, a 1952 readability test estimating the years of formal education needed to understand a text on the first reading.
+        The scale goes from 6 to 18, starting at the sixth grade in the United States.
+        The formula is : 0.4 * ( (words/sentences) + 100 * (complex words / words) )
+        """
         return self.traditional_score("gfi")
 
     def ari(self):
-        """Returns Automated Readability Index"""
+        """
+        Outputs the Automated readability index, a 1967 readability test estimating the US grade level needed to comprehend a text
+        The scale goes from 1 to 14, corresponding to age 5 to 18.
+        The formula is 4.71 * (characters / words) + 0.5 (words / sentences) - 21.43
+        """
         return self.traditional_score("ari")
 
     def fre(self):
-        """Returns Flesch Reading Ease"""
+        """
+        Outputs the Flesch reading ease, a 1975 readability test estimating the US school level needed to comprehend a text
+        The scale goes from 100 to 0, corresponding to Grade 5 at score 100, up to post-college below score 30.
+        The formula is 206.835 - 1.015 * (total words / total sentences) - 84.6 * (total syllables / total words)
+        """
         return self.traditional_score("fre")
 
     def fkgl(self):
-        """Returns Flesch–Kincaid Grade Level"""
+        """
+        Outputs the Flesch–Kincaid grade level, a 1975 readability test estimating the US grade level needed to comprehend a text
+        The scale is meant to be a one to one representation, a score of 5 means that the text should be appropriate for fifth graders.
+        The formula is 0.39 * (total words / total sentences)+11.8*(total syllables / total words) - 15.59
+        """
         return self.traditional_score("fkgl")
 
     def smog(self):
-        """Returns Simple Measure of Gobbledygook"""
+        """
+        Outputs the Simple Measure of Gobbledygook, a 1969 readability test estimating the years of education needed to understand a text
+        The scale is meant to be a one to one representation, a score of 5 means that the text should be appropriate for fifth graders.
+        The formula is 1.043 * Square root (Number of polysyllables * (30 / number of sentences)) + 3.1291
+        """
         return self.traditional_score("smog")
 
     def rel(self):
-        """Returns Reading Ease Level (Adaptation of FRE for french)"""
+        """
+        Outputs the Reading Ease Level, an adaptation of Flesch's reading ease for the French language,
+        with changes to the coefficients taking into account the difference in length between French and English words.
+        The formula is 207 - 1.015 * (Number of words / Number of sentences) - 73.6 * (Number of syllables / Number of words)
+        """
         return self.traditional_score("rel")
 
 
@@ -169,6 +194,7 @@ class ParsedText:
     def perplexity(self, force=False):
         """
         Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
+        Please refer to this paper for more details : https://doi.org/10.18653%252Fv1%252F2020.acl-main.240
 
         :param bool force: Indicates whether to force the calculation of a score or not.
         :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
