@@ -20,19 +20,25 @@ from .parsed_text import parsed_text
 from .parsed_collection import parsed_collection
 
 # Checklist :
-#     Remake structure to help differenciate between functions : ~ I think it's okay but I need some feedback
-#     Enable a way to "compile" in order to use underlying functions faster : V It's done, I should implement tests.
-#     Make sure code works both for texts (strings, or pre-tokenized texts) and corpus structure : ~ I think it works now, need to provide a function that converts "anything" to a corpus structure
-#     Add the methods related to machine learning or deep learning : ~ Need to make slightly different version for users (and document them)
-#     Add examples to the notebook to show how it can be used : ~ Done, need feedback now
+#     Remake structure to help differenciate between functions : V Should be fine
+#     Enable a way to "compile" in order to use underlying functions faster : ~ Done, need to modify underlying functions to take advantage of that when possible.
+#     Make sure code works both for texts (strings, or ide a function that converts "anything" to a corpus structure) : V Done, with the convert... functions in .utils
+#     Add the methods related to machine learning or deep learning) and corpus structure : ~ Detail documentation further
+#     Add examples to the notebook to show how it can be used : ~ Done, need feedback now (and add more examples)
 #     Add other measures that could be useful (Martinc | Crossley): ~ This is taking more time than expected since I'm also trying to understand what these do and why use them
 #     Experiment further : X Unfortunately, I haven't given much thought into how estimating readability could be improved, or if our hypotheses are sound.
 
 # For now :
 
-#     Continue developping discourse/cohesion/coherence features.
-#     Permettre de calculer scores|correlations en + automatiquement (Calculer scores de corr pour features cohesion (1er corpus minimum))
-#     Ajouter mesure de semi-partial correlation
+#     Continue developping discourse/cohesion/coherence features. : X finish coherence already, and maybe a bit of syntactic.
+#     Permettre de calculer scores|correlations en + automatiquement (Calculer scores de corr pour features cohesion (1er corpus minimum)) : Done.
+#     Ajouter mesure de semi-partial correlation : X
+
+# For today : tentative
+# Actually finish the discourse module
+# Fix the div 0 error in cosine similarities
+# Expand readme and the notebook
+# Work on synctactic features a bit?
 
 # Extra (not urgent) :
 #     Add more corpuses such as vikidia or wikimini : X (will probably start june 22 afternoon) :
@@ -73,14 +79,14 @@ class Readability:
         print("Acquiring Natural Language Processor...")
         if lang == "fr" and nlp == "spacy_sm":
             try:
-                self.nlp = spacy.load('fr_core_news_sm')
-                print("DEBUG: Spacy model location (already installed) : ", self.nlp._path)
+                self.nlp = spacy.load('fr_core_news_lg')
+                print("DEBUG: Spacy model location (already installed): ", self.nlp._path)
             except OSError:
                 print('Downloading spacy language model \n(Should only happen once)')
                 from spacy.cli import download
-                download('fr_core_news_sm')
-                self.nlp = spacy.load('fr_core_news_sm')
-                print("DEBUG: Spacy model location : ", self.nlp._path)
+                download('fr_core_news_lg')
+                self.nlp = spacy.load('fr_core_news_lg')
+                print("DEBUG: Spacy model location: ", self.nlp._path)
         else:
             print("ERROR : Natural Language Processor not found for parameters :  lang=",lang," nlp=",nlp,sep="")
             self.nlp = None
@@ -445,16 +451,25 @@ class Readability:
             raise RuntimeError("measure", "count_type_mention", "cannot be calculated.")
         func = discourse.count_type_mention
         return func(content,mention_type,self.nlp)
+    
+    def count_type_mention_proper_name(self,content):
+        return self.count_type_mention(content,"proper_name")
+    # indefinite NP, definite NP, proper names, personal pronouns, possessive determiners, demonstrative determiners,
+    # reflexive pronouns, relative pronouns, NPs without a determiner, indefinite pronouns, demonstrative pronouns,
 
     def count_type_opening(self,content,mention_type="proper_name"):
         if not self.check_score_and_dependencies_available("count_type_opening"):
             raise RuntimeError("measure", "count_type_opening", "cannot be calculated.")
-        func = discourse.count_type_mention
+        func = discourse.count_type_opening
         return func(content,mention_type,self.nlp)
+
+    def count_type_opening_proper_name(self,content):
+        return self.count_type_opening(content,"proper_name")
+
 
     # NOTE: the following methods are intended to be used with a corpus
     # Measures obtained from Machine Learning models :
-    # TODO: allow user to use default tf-idf matrix thing or with currently known features from other methods(common_scores text diversity, etc..)
+    # TODO: allow user to use default tf-idf matrix or with currently known features from other methods(common_scores, text diversity, etc..)
     def corpus_classify_ML(self,model_name,collection,plot=False):
         if model_name == "SVM":
             func = methods.classify_corpus_SVM
@@ -488,6 +503,7 @@ class Readability:
                     raise TypeError("Cannot use a collection containing only one class for classification purposes, please try with something else.")
         return None
 
+    # Machine Learning applications:
     def classify_corpus_SVM(self ,collection, plot=False):
         return self.corpus_classify_ML("SVM",collection,plot)
 
@@ -497,8 +513,7 @@ class Readability:
     def compare_ML_models(self, collection, plot=True):
         return self.corpus_classify_ML("compare",collection,plot)
 
-    #TODO WHEN GET BACK : then take care of fasttext/bert, then do other stuff.
-    # Measures obtained from Deep Learning models
+    # Deep Learning applications: 
     def classify_corpus_fasttext(self, collection, model_name = "fasttext"):
         func = fasttext.classify_corpus_fasttext
         return func(collection, model_name)

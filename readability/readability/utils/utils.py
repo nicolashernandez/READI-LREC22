@@ -83,9 +83,15 @@ def convert_text_to_string(text):
         doc = text
 
     elif any(isinstance(el, list) for el in text):
-        doc = ''
-        for sentence in text:
-            doc = doc + ' ' + ' '.join(sentence)
+        #this works but.. first sentence has a gap
+        # and every sentence has a gap between the ending mark and the last word
+        # also there are weird gaps for stuff like (ce soir - là)
+        # or  m\' a - t - elle dit
+        #so at least remove the first gap in first sentence and last gap in every sentence
+
+        doc = ' '.join(text[0][:-1]) + text[0][-1] # Make first sentence not start with a whitespace, and remove whitespace between text and last punctuation mark.
+        for sentence in text[1:]:
+            doc = doc + ' ' + ' '.join(sentence[:-1] ) + sentence[-1] # Remove whitespace between text and last punctuation mark.
         
     elif isinstance(text, list):
         doc = ' '.join(text)

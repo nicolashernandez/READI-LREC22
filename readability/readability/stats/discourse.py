@@ -228,14 +228,7 @@ def average_word_length_per_entity(text,nlp=None):
     counter = counter / nb_entities
     return counter / len(text) 
 
-# The next things : Co-reference chain properties.
-# Count types for each mention : indefinite NP, definite NP, proper names, personal pronouns, possessive determiners, demonstrative determiners,
-# reflexive pronouns, relative pronouns, NPs without a determiner, indefinite pronouns, demonstrative pronouns, average length of reference chain 
-
-# Additionally, check proportion of opening of chains where : indefinite NP, definite NP, proper names, NPs without a determiner, demonstrative NPs,
-# but also pronouns, (personal, demonstrative, indefinite, relative), possessives.
-
-# Also try to count both for : deictic pronouns | adverbs | resumptive pronouns | complex mentions (ohey i can actually do that one)
+# Co-reference chain properties.
 
 def average_length_of_reference_chains(text, nlp=None):
     doc = utils.convert_text_to_string(text)
@@ -246,31 +239,101 @@ def average_length_of_reference_chains(text, nlp=None):
     counter = counter / len(doc._.coref_chains) # Average over number of chains
     return counter
 
-#FIXME NOT DONE YET
+# Utility function for co-reference chains
+def spacy_filter_coreference_count(doc, nlp, mention_index, mention_type, noun_groups_info=None):
+        if mention_type == "indefinite_NP":
+            for possible_group in noun_groups_info:
+                if possible_group[0] < mention_index < possible_group[1]:
+                    if doc[possible_group[0]].morph.__contains__("Definite=Ind"):
+                        return 1
+            return 0
+        elif mention_type == "definite_NP":
+            for possible_group in noun_groups_info:
+                if possible_group[0] < mention_index < possible_group[1]:
+                    if doc[possible_group[0]].morph.__contains__("Definite=Def"):
+                        return 1
+            return 0
+        elif mention_type == "NP_without_determiner":
+            for possible_group in noun_groups_info:
+                if possible_group[0] < mention_index < possible_group[1]:
+                    if not doc[possible_group[0]].dep_ == "det":
+                        return 1
+            return 0
+        elif mention_type == "possessive_determiner":
+            if doc[mention_index].dep_ == "det" and doc[mention_index].morph.__contains__("Poss=Yes"):
+                return 1
+            else:
+                return 0
+        elif mention_type == "demonstrative_determiner":
+            if doc[mention_index].dep_ == "det" and doc[mention_index].morph.__contains__("PronType=Dem"):
+                return 1
+            else:
+                return 0
+        elif mention_type == "proper_name":
+            if doc[mention_index].pos_ == "PROPN":
+                return 1
+            else:
+                return 0
+        elif mention_type == "personal_pronoun":
+            #Nevermind that's incorrect
+            if doc[mention_index].pos_ == "PRON" and (doc[mention_index].morph.__contains__("Gender=Masc") or doc[mention_index].morph.__contains__("Gender=Fem")):
+                return 1
+            else:
+                return 0
+        elif mention_type == "reflexive_pronoun":
+            if doc[mention_index].pos_ == "PRON" and doc[mention_index].morph.__contains__("Reflex=Yes"):
+                return 1
+            else:
+                return 0
+        elif mention_type == "relative_pronoun":
+            if doc[mention_index].pos_ == "PRON" and doc[mention_index].morph.__contains__("PronType=Rel"):
+                return 1
+            else:
+                return 0
+        elif mention_type == "indefinite_pronoun":
+            # Can't figure out how to get it with only spacy's information
+            return 0
+        elif mention_type == "demonstrative_pronoun":
+            if doc[mention_index].pos_ == "PRON" and doc[mention_index].morph.__contains__("PronType=Dem"):
+                return 1
+            else:
+                return 0
+        else:
+            print("i don't recognize that type of mention")
+            return -1
+
 def count_type_mention(text, mention_type=None, nlp=None):
     #ok so for each mention get the corresponding spacy thing and see what it is. hopefully it'll all be accounted for but we'll have to go one by one:
     doc = utils.convert_text_to_string(text)
     doc = nlp(doc)
     counter = 0
-    # For each mention, get the index via mention.token_indexes. It's complex if nb_indexes > 1
+
+    # For noun phrases, coreferee only returns a single token but noun phrases are several token longs (they're spans)
+    # So each noun phrase's starting and ending indexes are stored for later.
+    noun_phrases_info= []
+    for np in doc.noun_chunks:
+        noun_phrases_info.append((np.start, np.end, np))
+
     for chain in doc._.coref_chains:
         for mention in chain:
             for index in mention.token_indexes:
-                #print(doc[index].text,"pos:",doc[index].pos_,"morph:",doc[index].morph,"dep:",doc[index].dep_)
-                counter +=1
+                counter += spacy_filter_coreference_count(doc, nlp, index, mention_type, noun_phrases_info)
     counter = counter / len(doc._.coref_chains) # Average over number of chains
     return counter
 
-#FIXME NOT DONE YET
 def count_type_opening(text, mention_type=None, nlp=None):
     doc = utils.convert_text_to_string(text)
     doc = nlp(doc)
     counter = 0
+
+    noun_phrases_info= []
+    for np in doc.noun_chunks:
+        noun_phrases_info.append((np.start, np.end, np))
+
     # For the first mention of each entity, get the index via mention.token_indexes. It's complex if nb_indexes > 1
     for chain in doc._.coref_chains:
         for index in chain[0].token_indexes:
-            #print(doc[index].text,"pos:",doc[index].pos_,"morph:",doc[index].morph,"dep:",doc[index].dep_)
-            counter +=1
+            counter += spacy_filter_coreference_count(doc, nlp, index, mention_type, noun_phrases_info)
     counter = counter / len(doc._.coref_chains) # Average over number of chains
     return counter
 
