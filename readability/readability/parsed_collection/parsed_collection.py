@@ -261,6 +261,7 @@ class ParsedCollection:
 
     def average_levenshtein_distance(self,mode="old20", force=False):
         return self.call_score(mode,[],force)
+    
     def old20(self, formula_type=None, force=False):
         """Returns average Orthographic Levenshtein Distance 20 (OLD20) in a text"""
         return self.average_levenshtein_distance("old20", force)

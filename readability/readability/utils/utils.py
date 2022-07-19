@@ -15,18 +15,14 @@ from unidecode import unidecode
 from ..parsed_collection import parsed_collection
 
 
-# Note : remove this when we're done, this is just a quick dev workaround
-# Will have to fix this with the new structure...
 DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'data'))
-#print(os.path.abspath(os.path.dirname(__file__)))
-def test_import(file_path):
+
+
+def load_pickle(file_path):
     with open(os.path.join(DATA_ENTRY_POINT,file_path+".pkl"),"rb") as file:
         return pickle.load(file)
 
-# This returns a dictionary containing the content of each text in a dictionary :
-# Note : I need to test this on different OS to make sure it works independently.
-# If I remember correctly, it produces the following : dict[class][text]
-# So we need to continue developping this. 
+# TODO: test this and fix if necessary.
 def generate_corpus_from_folder(folder_path):
     """
     Creates a dictionary with the same structure as the one used in our READI paper
@@ -59,7 +55,7 @@ def syllablesplit(input):
                 nb_syllabes+=1
                 break
     return nb_syllabes
-# ^ Current syllable splitter used in the notebooks (without the break)
+
 
 #The following function provides a better estimator, but is unused as it is not accurate enough.
 #def bettersyllablesplit(input):
@@ -83,12 +79,6 @@ def convert_text_to_string(text):
         doc = text
 
     elif any(isinstance(el, list) for el in text):
-        #this works but.. first sentence has a gap
-        # and every sentence has a gap between the ending mark and the last word
-        # also there are weird gaps for stuff like (ce soir - là)
-        # or  m\' a - t - elle dit
-        #so at least remove the first gap in first sentence and last gap in every sentence
-
         doc = ' '.join(text[0][:-1]) + text[0][-1] # Make first sentence not start with a whitespace, and remove whitespace between text and last punctuation mark.
         for sentence in text[1:]:
             doc = doc + ' ' + ' '.join(sentence[:-1] ) + sentence[-1] # Remove whitespace between text and last punctuation mark.
@@ -172,8 +162,6 @@ def count_occurences_in_document(text, spacy_filter, nlp=None, mode="text"):
 
 
 def load_dependency(dependency_name, nlp_processor=None):
-    #TODO : go get every dependency import/configuration thing and return a dictionary of what's needed
-    #It'll go in ReadabilityProcessor.dependencies[dependency] and can be accessed by other functions.
     if dependency_name == "GPT2_LM":
         print("importing GPT2 model..")
         model_name = "asi/gpt-fr-cased-small"
@@ -232,5 +220,3 @@ def load_dependency(dependency_name, nlp_processor=None):
 
     else:
         raise ValueError("Dependency '",dependency_name,"' was not recognized as a valid dependency.")
-
-    return 0

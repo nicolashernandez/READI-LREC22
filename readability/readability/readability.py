@@ -1,16 +1,19 @@
 """
-The Readability module interacts with the library's submodules to provide a bunch of useful functions and scores for estimating the readability of a text
-It will eventually support different languages.
+The Readability module interacts with the library's submodules to provide a bunch of useful functions and scores for estimating the readability of a text.
+By default, each score is available, but the user can choose to exclude some.
 
-This module provides the following services :
-At start-up : it "converts" a text or corpus into a structure useful for the other functions, and can also calculate relevant statistics via the .compile function (number of words, sentences, syllables, etc..)
-Calculating scores can be done without compiling beforehand, but is recommended in order to store information/scores each time a function is used, which can help speed up other functions.
-This module also lazily loads external resources for more complicated things, like calculating perplexity or the use of Machine Learning / Deep Learning models
+This module contains two types of components:
+First, the low-level processor, which is referenced in the documentation or in the code as a 'readability processor'.
+At start-up : It loads or imports external resources depending on which scores were kept.
+Afterwards, this processor can use these resources in order to calculate the scores the user wants.
+
+The second type are parsed texts, or collections of these texts, obtained by calling the parse or parseCollection functions from the readability processor.
+On top of containing the text itself, these store the scores after calculations, and also store a bundle of informations can be used by multiple functions
+in order to accelerate the process.
+Furthermore, parsed collections can use additional functions that necessitate multiple texts, for instance : text classification can be attempted.
+Please view the rest of the documentation for more details. 
 """
-import copy
-import math
 
-import pandas as pd
 import spacy
 from .utils import utils
 from .stats import diversity, perplexity, common_scores, word_list_based, syntactic, discourse, rsrs
@@ -52,48 +55,46 @@ from .parsed_collection import parsed_collection
 
 class Readability:
     """
-    The Readability class provides a way to access the underlying library modules in order to help estimate the complexity of any given text
-    List of methods : __init__, compile, corpus_info, stats, remove_outliers, score(score_name), scores, perplexity, do_function_with_default_arguments, get_corpus_scores, dubois_proportion, average_levenshtein_distance,
-    List of attributes : content, content_type, lang, nlp, perplexity_processor, classes, statistics, corpus_statistics
+    The Readability class provides a way to access the underlying library submodules in order to help estimate the complexity of any given text.
+    At start-up : It loads or imports external resources depending on which scores were kept.
+    Afterwards, this processor can use these resources in order to calculate the scores the user wants.
 
-    In its current state, scores are meant to be used with the French language, but this can change in the future.
+    - List of **attributes**::
+        :param str lang: Placeholder : Language the text was written in, in order to adapt some scores.
+        :param str nlp: Type of NLP processor to use, tentatively indicated with a "type_subtype" string.
+        :param dict informations: Dictionary associating scores with the functions needed to calculate them, alongside the dependencies needed.
+        :param dict excluded_informations: Same as above, but contains scores that have been excluded at start-up.
+        :param dict dependencies: Dictionary associating dependency name with whatever is needed, usually a language model and its parameters.
     """
-    def __init__(self, exclude = [""], content="dummy", lang = "fr", nlp = "spacy_sm"):
+    def __init__(self, exclude = [""], lang = "fr", nlp = "spacy_sm"):
         """
         Constructor of the Readability class, won't return any value but creates the attributes :
-        self.content, self.content_type, self.nlp, self.lang, and self.classes only if input is a corpus.
 
-        :param content: Content of a text, or a corpus
-        :type content: str, list(str), list(list(str)), converted into list(list(str)) or dict[class][text][sentence][token]
-        :param list(str) exclude: List of type of scores to exclude, compared to the informations object to possibly remove unused dependencies
-        :param str lang: Language the text was written in, in order to adapt some scores.
-        :param str nlp: Type of NLP processor to use, indicated by a "type_subtype" string.
-        :param str perplexity_processor: Type of processor to use for the calculation of pseudo-perplexity
+        :param list(str) exclude: List of scores to exclude, in order to modify the `informations` and `dependencies` attributes.
+        :param str lang: Placeholder : Language the text was written in, in order to adapt some scores.
+        :param str nlp: Type of NLP processor to use, tentatively indicated with a "type_subtype" string.
         """
         self.lang = lang
         
         # Handle the NLP processor (mainly for tokenization in case we're given a text as a string)
-        # Note : I tried adding the spacy model as a dependency in setup.cfg:
+        # FIXME : I tried adding the spacy model as a dependency in setup.cfg:
         # fr_core_news_sm@https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.3.0/fr_core_news_sm-3.3.0.tar.gz#egg=fr_core_news_sm
         # But I can't figure out how to use it, so this is a workaround.
         print("Acquiring Natural Language Processor...")
         if lang == "fr" and nlp == "spacy_sm":
             try:
-                self.nlp = spacy.load('fr_core_news_lg')
+                self.nlp = spacy.load('fr_core_news_sm')
                 print("DEBUG: Spacy model location (already installed): ", self.nlp._path)
             except OSError:
                 print('Downloading spacy language model \n(Should only happen once)')
                 from spacy.cli import download
-                download('fr_core_news_lg')
-                self.nlp = spacy.load('fr_core_news_lg')
+                download('fr_core_news_sm')
+                self.nlp = spacy.load('fr_core_news_sm')
                 print("DEBUG: Spacy model location: ", self.nlp._path)
         else:
-            print("ERROR : Natural Language Processor not found for parameters :  lang=",lang," nlp=",nlp,sep="")
-            self.nlp = None
+            print("ERROR : Natural Language Processor not found for parameters : lang=",lang," nlp=",nlp,sep="")
+            raise RuntimeError("ERROR : Natural Language Processor not found for parameters : lang=",lang," nlp=",nlp,sep="")
         
-        # Handling text that needs to be converted into lists of tokens
-        self.content = utils.convert_text_to_sentences(content,self.nlp)
-   
         # This dictionary associates values with the functions used to calculate them, alongside the dependencies needed.
         self.informations = dict(
             gfi=dict(function=self.gfi,dependencies=[],default_arguments=dict()),
@@ -119,13 +120,11 @@ class Readability:
             average_entity_word_length=dict(function=self.average_word_length_per_entity,dependencies=["coreferee"],default_arguments=dict()),
             count_type_mention=dict(function=self.count_type_mention,dependencies=["coreferee"],default_arguments=dict(mention_type="proper_name")),
             count_type_opening=dict(function=self.count_type_opening,dependencies=["coreferee"],default_arguments=dict(mention_type="proper_name"))
-            #indefinite NP, definite NP, proper names, personal pronouns, possessive determiners, demonstrative determiners,
-            # reflexive pronouns, relative pronouns, NPs without a determiner, indefinite pronouns, demonstrative pronouns,
-
-            #following aren't 100% implemented yet
+            #following aren't implemented yet:
             #rsrs=dict(function=self.stub_rsrs,dependencies=["GPT2_LM"]),
             
-            # These are meant to be used with a corpus only, so they should appear for a ParsedCollection instance, but not ParsedText.
+            # TODO: These are meant to be used with a corpus only, so they should appear for a ParsedCollection instance, but not ParsedText.
+            # However, I currently don't know how to implement that.
             #SVM_mean_accuracy=dict(function=self.classify_corpus_SVM,dependencies=[]),
             #MLP_mean_accuracy=dict(function=self.classify_corpus_MLP,dependencies=[]),
             #bert_metrics=dict(function=self.classify_corpus_BERT,dependencies=["BERT"]),
@@ -154,13 +153,14 @@ class Readability:
 
     # Utility functions : parse/load/checks
     def parse(self,text):
-        """Creates a ParsedText instance that relies on the ReadabilityProcessor in order to output various readability measures."""
+        """Returns a ParsedText instance, containing the text and a reference to the processor used, providing a way to store and output readability measures""" 
         return parsed_text.ParsedText(text,self)
     
     def parseCollection(self,collection):
         """
         Creates a ParsedCollection instance that relies on the ReadabilityProcessor in order to output various readability measures.
-        Currently, only three types of structures are accepted:
+
+        Currently, three types of structures will be recognized as a collection of texts, albeit they'll be converted to the first format:
         A corpus-like dictionary that associates labels with texts. e.g : dict(class_1:{text1,text2},class_2:{text1,text2}).
         A list of lists of texts, given labels for compatibility with other functions.
         A singular list of texts, given a label for compatibility with other functions.
@@ -177,7 +177,7 @@ class Readability:
         elif isinstance(collection, list):
             try:
                 # Check if collection contains a list of texts or a list of lists of texts
-                # This raises an exception if not applied on a text.
+                # This raises an exception if not applied on a text, which means that we're currently handling a list containing lists of texts
                 utils.convert_text_to_string(collection[0])
             except Exception:
                 # Case with multiple lists of texts:
@@ -241,7 +241,13 @@ class Readability:
 
     # Traditional measures: 
     def score(self, name, content, statistics = None):
-        """This function calls a score's calculation from the submodule common_scores"""
+        """
+        Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
+        Please refer to this paper for more details : https://doi.org/10.18653%252Fv1%252F2020.acl-main.240
+
+        :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
+        :rtype: float
+        """
         if name == "gfi":
             func = common_scores.GFI_score
         elif name == "ari":
@@ -265,6 +271,7 @@ class Readability:
     def gfi(self, content, statistics = None):
         """
         Outputs the Gunning fog index, a 1952 readability test estimating the years of formal education needed to understand a text on the first reading.
+
         The scale goes from 6 to 18, starting at the sixth grade in the United States.
         The formula is : 0.4 * ( (words/sentences) + 100 * (complex words / words) )
         """
@@ -272,7 +279,8 @@ class Readability:
 
     def ari(self, content, statistics = None):
         """
-        Outputs the Automated readability index, a 1967 readability test estimating the US grade level needed to comprehend a text
+        Outputs the Automated readability index, a 1967 readability test estimating the US grade level needed to comprehend a text.
+
         The scale goes from 1 to 14, corresponding to age 5 to 18.
         The formula is 4.71 * (characters / words) + 0.5 (words / sentences) - 21.43
         """
@@ -280,7 +288,8 @@ class Readability:
 
     def fre(self, content, statistics = None):
         """
-        Outputs the Flesch reading ease, a 1975 readability test estimating the US school level needed to comprehend a text
+        Outputs the Flesch reading ease, a 1975 readability test estimating the US school level needed to comprehend a text.
+
         The scale goes from 100 to 0, corresponding to Grade 5 at score 100, up to post-college below score 30.
         The formula is 206.835 - 1.015 * (total words / total sentences) - 84.6 * (total syllables / total words)
         """
@@ -288,7 +297,8 @@ class Readability:
 
     def fkgl(self, content, statistics = None):
         """
-        Outputs the Flesch–Kincaid grade level, a 1975 readability test estimating the US grade level needed to comprehend a text
+        Outputs the Flesch–Kincaid grade level, a 1975 readability test estimating the US grade level needed to comprehend a text.
+
         The scale is meant to be a one to one representation, a score of 5 means that the text should be appropriate for fifth graders.
         The formula is 0.39 * (total words / total sentences)+11.8*(total syllables / total words) - 15.59
         """
@@ -296,7 +306,8 @@ class Readability:
 
     def smog(self, content, statistics = None):
         """
-        Outputs the Simple Measure of Gobbledygook, a 1969 readability test estimating the years of education needed to understand a text
+        Outputs the Simple Measure of Gobbledygook, a 1969 readability test estimating the years of education needed to understand a text.
+
         The scale is meant to be a one to one representation, a score of 5 means that the text should be appropriate for fifth graders.
         The formula is 1.043 * Square root (Number of polysyllables * (30 / number of sentences)) + 3.1291
         """
@@ -304,8 +315,9 @@ class Readability:
 
     def rel(self, content, statistics = None):
         """
-        Outputs the Reading Ease Level, an adaptation of Flesch's reading ease for the French language,
-        with changes to the coefficients taking into account the difference in length between French and English words.
+        Outputs the Reading Ease Level, an adaptation of Flesch's reading ease for the French language.
+
+        The changes to the coefficients take into account the difference in length between French and English words.
         The formula is 207 - 1.015 * (Number of words / Number of sentences) - 73.6 * (Number of syllables / Number of words)
         """
         return self.score("rel", content, statistics)
@@ -314,9 +326,10 @@ class Readability:
     def perplexity(self,content):
         """
         Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
-        Please refer to this paper for more details : https://doi.org/10.18653%252Fv1%252F2020.acl-main.240
+        
+        Please refer to this paper for more details : https://doi.org/10.48550/arXiv.1910.14659
 
-        :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
+        :return: The pseudo-perplexity measure for a text
         :rtype: float
         """
         if not self.check_score_and_dependencies_available("pppl"):
@@ -325,7 +338,7 @@ class Readability:
         return perplexity.PPPL_score(self.dependencies["GPT2_LM"],content)
     
     def stub_rsrs():
-        #TODO : check submodule for implementation details
+        #TODO : check submodule stats/rsrs for implementation details
         print("not implemented yet")
         return -1
     
@@ -334,14 +347,15 @@ class Readability:
     def diversity(self, content, ratio_type, formula_type=None):
         """
         Outputs a measure of text diversity based on which feature to use, and which version of the formula is used.
+
         Default formula is "nb lexical items / nb unique lexical items",
-        'root' formula uses the square root for the denominator,
-        'corrected' formula mutliplies the number of words by two before taking the square root for the denominator.
+        'root' formula applies the square root to the denominator,
+        'corrected' formula mutliplies the number of words by two before applying the square root to the denominator.
 
         :param str ratio_type: Which text diversity measure to use: "ttr" is text token ratio, "ntr" is noun token ratio
         :param str formula_type: What kind of formula version to use: "corrected", "root", and default standard are available for token ratios.
         :return: a measure of text diversity, or a dictionary of these measures
-        :rtype: :rtype: Union[float,dict[str][list(float)]]
+        :rtype: float
         """
         if ratio_type == "ttr":
             func = diversity.type_token_ratio
@@ -380,12 +394,17 @@ class Readability:
     def average_levenshtein_distance(self, content, mode = "old20"):
         """
         Returns the average Orthographic Levenshtein Distance 20 (OLD20), or its phonemic equivalent (PLD20).
+
+        They represent the mean Levenshtein distance between a word and its 20 closest neighbours:
+        OLD20 is an alternative to the orthographical neighbourhood index that has been shown to correlate with text difficulty,
+        due to being related to the perceptual ambiguity of word recognition when there exists close orthographic neighbours.
+        This is the case for a low OLD20 value.
+        
         Currently using the Lexique 3.0 database for French texts, version 3.83. More details here : http://www.lexique.org/
-        OLD20 is an alternative to the orthographical neighbourhood index that has been shown to correlate with text difficulty.
 
         :param str type: What kind of value to return, OLD20 or PLD20.
         :return: Average of OLD20 or PLD20 for each word in current text
-        :rtype: Union[float,dict[str][list(float)]]
+        :rtype: float
         """
         func = word_list_based.average_levenshtein_distance
         if not self.check_score_and_dependencies_available(mode):
@@ -393,26 +412,42 @@ class Readability:
         return func(self.dependencies["lexique_dataframe"]["dataframe"],content,self.nlp,mode)
 
     def old20(self, content):
+        """Returns Orthographic Levenshtein distance for each word in a text."""
         return self.average_levenshtein_distance(content, "old20")
 
     def pld20(self, content):
+        """Returns Phonemic Levenshtein distance for each word in a text."""
         return self.average_levenshtein_distance(content, "pld20")
         
     # Measures related to text cohesion :
     # NOTE : These 3 could be grouped together in the same function, and just set an argument type="X"
     def count_pronouns(self, content, mode="text"):
+        """Returns number of pronouns in a text"""
         func = discourse.nb_pronouns
         return func(content,self.nlp,mode)
     
     def count_articles(self, content, mode="text"):
+        """Returns number of articles in a text"""
         func = discourse.nb_articles
         return func(content,self.nlp,mode)
         
     def count_proper_nouns(self, content, mode="text"):
+        """Returns number of proper nouns in a text"""
         func = discourse.nb_proper_nouns
         return func(content,self.nlp,mode)
 
     def lexical_cohesion_tfidf(self, content, mode="text"):
+        """
+        Returns the average cosine similarity between adjacent sentences in a text.
+
+        By using the 'mode' parameter, can use inflected forms of tokens or the corresponding lemmas, possibly filtering the text beforehand
+        in order to keep only nouns, proper names, and pronouns.
+        Valid values for mode are : 'text', 'lemma', 'subgroup_text', 'subgroup_lemma'.
+
+        :param str mode: Whether to filter the text, and whether to use raw texts or lemmas.
+        :return: a ratio of words in the current text, that appear in the Dubois-Buyse word list.
+        :rtype: float
+        """
         if not self.check_score_and_dependencies_available("cosine_similarity_tfidf"):
             raise RuntimeError("measure 'cosine_similarity_tfidf' cannot be calculated.")
         func = discourse.average_cosine_similarity_tfidf
@@ -420,6 +455,12 @@ class Readability:
 
     # NOTE: this seems to output the same values, whether we use text or lemmas, probably due to the type of model used.
     def lexical_cohesion_LDA(self, content, mode="text"):
+        """
+        Returns the average cosine similarity between adjacent sentences in a text.
+        
+        By using the 'mode' parameter, can use inflected forms of words or their lemmas.
+        Valid values for mode are : 'text', 'lemma'.
+        """
         if not self.check_score_and_dependencies_available("cosine_similarity_LDA"):
             raise RuntimeError("measure 'cosine_similarity_LDA' cannot be calculated.")
         func = discourse.average_cosine_similarity_LDA
@@ -452,10 +493,9 @@ class Readability:
         func = discourse.count_type_mention
         return func(content,mention_type,self.nlp)
     
+    #TODO : finish listing each possible variant one by one..
     def count_type_mention_proper_name(self,content):
         return self.count_type_mention(content,"proper_name")
-    # indefinite NP, definite NP, proper names, personal pronouns, possessive determiners, demonstrative determiners,
-    # reflexive pronouns, relative pronouns, NPs without a determiner, indefinite pronouns, demonstrative pronouns,
 
     def count_type_opening(self,content,mention_type="proper_name"):
         if not self.check_score_and_dependencies_available("count_type_opening"):
@@ -469,7 +509,7 @@ class Readability:
 
     # NOTE: the following methods are intended to be used with a corpus
     # Measures obtained from Machine Learning models :
-    # TODO: allow user to use default tf-idf matrix or with currently known features from other methods(common_scores, text diversity, etc..)
+    # TODO: allow user to optionally also use currently known features from other methods(common_scores, text diversity, etc..)
     def corpus_classify_ML(self,model_name,collection,plot=False):
         if model_name == "SVM":
             func = methods.classify_corpus_SVM

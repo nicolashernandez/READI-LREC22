@@ -125,7 +125,7 @@ def average_cosine_similarity_tfidf(text, nlp = None, mode="text"):
 
     # Average the cosine_similarity value between each adjacent sentence
     for index, submatrix in enumerate(similarity_matrix[:-1]):
-        average_cosine_similarity += submatrix[index+1] 
+        average_cosine_similarity += submatrix[index+1]
     average_cosine_similarity = average_cosine_similarity / len(similarity_matrix[:-1])
 
     return average_cosine_similarity
@@ -158,14 +158,16 @@ def average_cosine_similarity_LDA(model, text, nlp = None, mode="text"):
     text_vectors = []
     for sentence in prepped_text:
         text_vectors.append(dictionary.doc2bow(sentence))
-    #similarity = model.wmdistance(text_vectors[0], text_vectors[1])
+    #similarity = model.wmdistance(sentences[0], sentences[1])
+    #similarity = model.n_similarity(sentences[0], sentences[1])
 
     # Average the cosine_similarity value between each adjacent sentence
     average_cosine_similarity = 0
-    # TODO: Handle texts that only have one sentence in them somehow.
     if len(text_vectors[:-1]) > 0:
         for index in range(len(text_vectors[:-1])):
-            average_cosine_similarity = cossim(text_vectors[index], text_vectors[index+1])
+            average_cosine_similarity += cossim(text_vectors[index], text_vectors[index+1])
+            #average_cosine_similarity += model.similarity(sentences[index], sentences[index+1])
+            #average_cosine_similarity += model.n_similarity(sentences[index], sentences[index+1])
         average_cosine_similarity = average_cosine_similarity / len(text_vectors[:-1])
     else:
         average_cosine_similarity = 0
@@ -275,7 +277,7 @@ def spacy_filter_coreference_count(doc, nlp, mention_index, mention_type, noun_g
             else:
                 return 0
         elif mention_type == "personal_pronoun":
-            #Nevermind that's incorrect
+            # FIXME: this is not accurate enough.
             if doc[mention_index].pos_ == "PRON" and (doc[mention_index].morph.__contains__("Gender=Masc") or doc[mention_index].morph.__contains__("Gender=Fem")):
                 return 1
             else:
