@@ -8,7 +8,9 @@ from ktrain import text
 import os
 
 def classify_corpus_BERT(corpus, model_name = "camembert-base", percent_train=90):
-    """Imports, configures, and trains a BERT model.
+    """
+    Imports, configures, and trains a BERT model.
+    
     :param corpus: Data input, preferably as a dict(class_label:list(text))
     :param str model_name: Choice of language model to use : bert-base-multilingual-cased, camembert-base, flaubert/flaubert_base_cased
     :return: Classification task metrics, as detailed in ..models.compute_evaluation_metrics() for more details

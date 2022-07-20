@@ -14,7 +14,7 @@ Therefore, some code is used when initializing the readability processor in orde
 
 > ⚠️ **FIXME:** Rename function **score** to **traditional_score**.
 
-In the module, the score function acts as a gateway to the submodule which calculates traditional scores. This can be fixed by renaming it to traditional_score across each file in order for clarification.
+In the module, the score function acts as a gateway to the submodule which calculates traditional scores. This can be fixed by renaming it to traditional_score across each file for clarification.
 
 > ⚠️ **FIXME:** function **lexical_cohesion_LDA** might have an issue.
 
@@ -39,9 +39,11 @@ This implies passing information from a *ParsedText* or *ParsedCollection* insta
 
 ## In utils:
 > ⚠️ **FIXME:** Untested function **generate_corpus_from_folder**.
+
 This function is supposed to generate a corpus, which can then be parsed into a *ParsedCollection*. However this function was never used during development and is currently untested.
 
 > 📝 **TODO:** Improve function **syllablesplit**.
+
 The current function is a poor estimator of the number of syllables in a word, as it only counts the number of vowels. An improvement has been proposed by only counting vowels that are not preceded by another vowel, but that is still not accurate enough to warrant a change.
 
 ## In stats/common_scores.py :
@@ -49,3 +51,22 @@ The current function is a poor estimator of the number of syllables in a word, a
 
 These being GFI, ARI due to using incorrect formulas, SMOG due to an error in calculating polysyllables, FRE due to a wrong variable assignation.
 These were kept as is, in order to keep the original paper's experiments reproducible.
+
+## In stats/discourse :
+> 📋 **NOTE:** Usage of coreference chains via coreferee library could be modified or improved.
+
+Results don't seem very accurate.
+
+> 📝 **TODO:** Figure out how to recognize deictic words.
+
+Deictic words refer to a specific time, place, or person in context. Their semantic meaning is fixed, but the denoted meaning can change.
+Example : I love *this* city.
+Knowledge of the current location is needed to identify which city is being referred to.
+
+> 📝 **TODO:** Implement other cohesion features.
+
+There exists a notion called Lexical Tightness. Further research is needed.
+
+> ⚠️ **FIXME:** Recognizing personal pronouns isn't accurate enough
+
+Please fix in function **spacy_filter_coreference_count**

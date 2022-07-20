@@ -8,7 +8,8 @@ from ktrain import text
 
 
 def classify_corpus_fasttext(corpus, model_name = "fasttext"):
-    """Imports, configures, and trains a fastText model.
+    """
+    Imports, configures, and trains a fastText model.
 
     :param corpus: Data input, preferably as a dict(class_label:list(text))
     :param str model_name: Choice of language model to use : fasttext, bigru, nbsvm

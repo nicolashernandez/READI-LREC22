@@ -88,10 +88,18 @@ def nb_proper_nouns(text, nlp=None, mode="text"):
 # Measures related to lexical cohesion :
 def average_cosine_similarity_tfidf(text, nlp = None, mode="text"):
     """
-    Returns the average cosine similarity between adjacent sentences in a text.
-    By using the 'mode' parameter, can use inflected forms of tokens or the corresponding lemmas, possibly filtering the text beforehand
+    Returns the average cosine similarity between adjacent sentences in a text after TFIDF representation.
+
+    This can be done by representing the contents of each sentence in a term frequency-inverse document frequency matrix,
+    and using that to calculate the cosine similarity between each represented sentence.
+
+    By using the 'mode' parameter, can use inflected forms of tokens or their lemmas, possibly filtering the text beforehand
     in order to keep only nouns, proper names, and pronouns.
     Valid values for mode are : 'text', 'lemma', 'subgroup_text', 'subgroup_lemma'.
+    
+    :param str mode: Whether to filter the text, and whether to use raw texts or lemmas.
+    :return: Average of cosine similarity between each adjacent sentence [i, i+1]
+    :rtype: float
     """
     # Group sentences together to be compatible with the tfidf_vectorizer and prepare tokens depending on selected mode :
     # text | lemmas | sub-grouped text | sub-grouped lemmas
@@ -133,8 +141,19 @@ def average_cosine_similarity_tfidf(text, nlp = None, mode="text"):
 def average_cosine_similarity_LDA(model, text, nlp = None, mode="text"):
     """
     Returns the average cosine similarity between adjacent sentences in a text.
-    By using the 'mode' parameter, can use inflected forms of words or their lemmas.
+
+    This is a step further than the TFIDF method since this instead relates "topics" together instead of simply indicating
+    whether two sentences share some exact words.
+    This is done thanks to GenSim and Word2Vec : By first converting a text's sentences into BOW vectors,
+    then by using the model to see if two adjacent sentences share the same topics.
+
+
+    By using the 'mode' parameter, can use inflected forms of tokens or their lemmas.
     Valid values for mode are : 'text', 'lemma'.
+
+    :param str mode: Whether to filter the text, and whether to use raw texts or lemmas.
+    :return: Average of cosine similarity between each adjacent sentence [i, i+1]
+    :rtype: float
     """
     # Group sentences together and keep text or lemmas
     sentences = utils.convert_text_to_sentences(text, nlp)
@@ -158,18 +177,19 @@ def average_cosine_similarity_LDA(model, text, nlp = None, mode="text"):
     text_vectors = []
     for sentence in prepped_text:
         text_vectors.append(dictionary.doc2bow(sentence))
-    #similarity = model.wmdistance(sentences[0], sentences[1])
-    #similarity = model.n_similarity(sentences[0], sentences[1])
+    
 
     # Average the cosine_similarity value between each adjacent sentence
     average_cosine_similarity = 0
     if len(text_vectors[:-1]) > 0:
         for index in range(len(text_vectors[:-1])):
             average_cosine_similarity += cossim(text_vectors[index], text_vectors[index+1])
+            #average_cosine_similarity = model.wmdistance(sentences[index], sentences[index+1])
             #average_cosine_similarity += model.similarity(sentences[index], sentences[index+1])
             #average_cosine_similarity += model.n_similarity(sentences[index], sentences[index+1])
         average_cosine_similarity = average_cosine_similarity / len(text_vectors[:-1])
     else:
+        # This happens if text vector somehow cannot be created.
         average_cosine_similarity = 0
 
     return average_cosine_similarity
@@ -177,7 +197,8 @@ def average_cosine_similarity_LDA(model, text, nlp = None, mode="text"):
 # Things that can be done with coreferee for features based on coreference chains. :
 def entity_density(text,nlp=None,unique=False):
     """
-    Entity density ~~ total|average number of all/unique entities in document
+    Entity density is the number of all or unique entities in document, divided by text length.
+    
     :param bool unique: Whether to return proportion of all entities in document, or only unique entities.
     """
     doc = utils.convert_text_to_string(text)
@@ -193,6 +214,7 @@ def entity_density(text,nlp=None,unique=False):
         return counter / len(text)
 
 def proportion_referring_entity(text,nlp=None):
+    """Returns amount of anaphoric mentions in text : Mentions of an entity except for the entity itself."""
     doc = utils.convert_text_to_string(text)
     doc = nlp(doc)
     counter = 0
@@ -203,17 +225,18 @@ def proportion_referring_entity(text,nlp=None):
 
 
 # NOTE: coreferee only gives us one token per entity, so things like New York will be shortened to New
-# Unfortunately, coreferee ignores the additional pipeline component 'merge_entities'.
+# Unfortunately, coreferee ignores the additional spacy pipeline component 'merge_entities'.
 # A temporary solution is to use spacy.ents to get the full name of any recognized named entity.
 # However this won't work for not-named entities that are composite, like "cette femme".
-def average_word_length_per_entity(text,nlp=None):
-    """"""
+def average_entity_word_length(text,nlp=None):
+    """Returns average word length of each entity."""
 
     doc = utils.convert_text_to_string(text)
     counter = 0
     entity_dict = dict()
     nb_entities = 0
     doc = nlp(doc)
+    # Store composite entity's length for later
     for ent in doc.ents:
         entity_dict[ent.start] = len(ent.text.split())
 
@@ -221,7 +244,7 @@ def average_word_length_per_entity(text,nlp=None):
         for mention in chain:
             nb_entities = nb_entities + 1
             for index in mention.token_indexes:
-                # At this point we have an index, we check if that index is part of a composite thing
+                # At this point we have an index, check if that index is part of a composite entity to get its length.
                 if index in list(entity_dict.keys()):
                     counter += entity_dict[index]
                 else:
@@ -232,7 +255,8 @@ def average_word_length_per_entity(text,nlp=None):
 
 # Co-reference chain properties.
 
-def average_length_of_reference_chains(text, nlp=None):
+def average_length_reference_chain(text, nlp=None):
+    """Counts number of mentions appearing in coreference chains, and returns the average."""
     doc = utils.convert_text_to_string(text)
     doc = nlp(doc)
     counter = 0
@@ -243,66 +267,67 @@ def average_length_of_reference_chains(text, nlp=None):
 
 # Utility function for co-reference chains
 def spacy_filter_coreference_count(doc, nlp, mention_index, mention_type, noun_groups_info=None):
-        if mention_type == "indefinite_NP":
-            for possible_group in noun_groups_info:
-                if possible_group[0] < mention_index < possible_group[1]:
-                    if doc[possible_group[0]].morph.__contains__("Definite=Ind"):
-                        return 1
-            return 0
-        elif mention_type == "definite_NP":
-            for possible_group in noun_groups_info:
-                if possible_group[0] < mention_index < possible_group[1]:
-                    if doc[possible_group[0]].morph.__contains__("Definite=Def"):
-                        return 1
-            return 0
-        elif mention_type == "NP_without_determiner":
-            for possible_group in noun_groups_info:
-                if possible_group[0] < mention_index < possible_group[1]:
-                    if not doc[possible_group[0]].dep_ == "det":
-                        return 1
-            return 0
-        elif mention_type == "possessive_determiner":
-            if doc[mention_index].dep_ == "det" and doc[mention_index].morph.__contains__("Poss=Yes"):
-                return 1
-            else:
-                return 0
-        elif mention_type == "demonstrative_determiner":
-            if doc[mention_index].dep_ == "det" and doc[mention_index].morph.__contains__("PronType=Dem"):
-                return 1
-            else:
-                return 0
-        elif mention_type == "proper_name":
-            if doc[mention_index].pos_ == "PROPN":
-                return 1
-            else:
-                return 0
-        elif mention_type == "personal_pronoun":
-            # FIXME: this is not accurate enough.
-            if doc[mention_index].pos_ == "PRON" and (doc[mention_index].morph.__contains__("Gender=Masc") or doc[mention_index].morph.__contains__("Gender=Fem")):
-                return 1
-            else:
-                return 0
-        elif mention_type == "reflexive_pronoun":
-            if doc[mention_index].pos_ == "PRON" and doc[mention_index].morph.__contains__("Reflex=Yes"):
-                return 1
-            else:
-                return 0
-        elif mention_type == "relative_pronoun":
-            if doc[mention_index].pos_ == "PRON" and doc[mention_index].morph.__contains__("PronType=Rel"):
-                return 1
-            else:
-                return 0
-        elif mention_type == "indefinite_pronoun":
-            # Can't figure out how to get it with only spacy's information
-            return 0
-        elif mention_type == "demonstrative_pronoun":
-            if doc[mention_index].pos_ == "PRON" and doc[mention_index].morph.__contains__("PronType=Dem"):
-                return 1
-            else:
-                return 0
+    """Utility function for handling co-reference chains, not meant to be called directly from the processor."""
+    if mention_type == "indefinite_NP":
+        for possible_group in noun_groups_info:
+            if possible_group[0] < mention_index < possible_group[1]:
+                if doc[possible_group[0]].morph.__contains__("Definite=Ind"):
+                    return 1
+        return 0
+    elif mention_type == "definite_NP":
+        for possible_group in noun_groups_info:
+            if possible_group[0] < mention_index < possible_group[1]:
+                if doc[possible_group[0]].morph.__contains__("Definite=Def"):
+                    return 1
+        return 0
+    elif mention_type == "NP_without_determiner":
+        for possible_group in noun_groups_info:
+            if possible_group[0] < mention_index < possible_group[1]:
+                if not doc[possible_group[0]].dep_ == "det":
+                    return 1
+        return 0
+    elif mention_type == "possessive_determiner":
+        if doc[mention_index].dep_ == "det" and doc[mention_index].morph.__contains__("Poss=Yes"):
+            return 1
         else:
-            print("i don't recognize that type of mention")
-            return -1
+            return 0
+    elif mention_type == "demonstrative_determiner":
+        if doc[mention_index].dep_ == "det" and doc[mention_index].morph.__contains__("PronType=Dem"):
+            return 1
+        else:
+            return 0
+    elif mention_type == "proper_name":
+        if doc[mention_index].pos_ == "PROPN":
+            return 1
+        else:
+            return 0
+    elif mention_type == "personal_pronoun":
+        # FIXME: this is not accurate enough.
+        if doc[mention_index].pos_ == "PRON" and (doc[mention_index].morph.__contains__("Gender=Masc") or doc[mention_index].morph.__contains__("Gender=Fem")):
+            return 1
+        else:
+            return 0
+    elif mention_type == "reflexive_pronoun":
+        if doc[mention_index].pos_ == "PRON" and doc[mention_index].morph.__contains__("Reflex=Yes"):
+            return 1
+        else:
+            return 0
+    elif mention_type == "relative_pronoun":
+        if doc[mention_index].pos_ == "PRON" and doc[mention_index].morph.__contains__("PronType=Rel"):
+            return 1
+        else:
+            return 0
+    elif mention_type == "indefinite_pronoun":
+        # Can't figure out how to get it with only spacy's information
+        return 0
+    elif mention_type == "demonstrative_pronoun":
+        if doc[mention_index].pos_ == "PRON" and doc[mention_index].morph.__contains__("PronType=Dem"):
+            return 1
+        else:
+            return 0
+    else:
+        print("i don't recognize that type of mention")
+        return -1
 
 def count_type_mention(text, mention_type=None, nlp=None):
     #ok so for each mention get the corresponding spacy thing and see what it is. hopefully it'll all be accounted for but we'll have to go one by one:
@@ -316,6 +341,7 @@ def count_type_mention(text, mention_type=None, nlp=None):
     for np in doc.noun_chunks:
         noun_phrases_info.append((np.start, np.end, np))
 
+    # For the first mention of each entity, get the index via mention.token_indexes. It's a complex mention if nb token_indexes > 1
     for chain in doc._.coref_chains:
         for mention in chain:
             for index in mention.token_indexes:
@@ -328,11 +354,13 @@ def count_type_opening(text, mention_type=None, nlp=None):
     doc = nlp(doc)
     counter = 0
 
+    # For noun phrases, coreferee only returns a single token but noun phrases are several token longs (they're spans)
+    # So each noun phrase's starting and ending indexes are stored for later.
     noun_phrases_info= []
     for np in doc.noun_chunks:
         noun_phrases_info.append((np.start, np.end, np))
 
-    # For the first mention of each entity, get the index via mention.token_indexes. It's complex if nb_indexes > 1
+    # For the first mention of each entity, get the index via mention.token_indexes. It's a complex mention if nb token_indexes > 1
     for chain in doc._.coref_chains:
         for index in chain[0].token_indexes:
             counter += spacy_filter_coreference_count(doc, nlp, index, mention_type, noun_phrases_info)
@@ -362,6 +390,6 @@ def distance_object_to_none(text,nlp = None):
     """
     return 0
 
-#might skip this one if spacy can't recognize chains, or find another tool
+# TODO: figure out how to recognize deictic words.
 def first_chain_is_deictic(text,nlp=None):
     return 0

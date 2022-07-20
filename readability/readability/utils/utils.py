@@ -19,6 +19,7 @@ DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..
 
 
 def load_pickle(file_path):
+    """Loads a .pkl file containing serialized data from the data/ folder, usually a corpus of texts"""
     with open(os.path.join(DATA_ENTRY_POINT,file_path+".pkl"),"rb") as file:
         return pickle.load(file)
 
@@ -46,7 +47,9 @@ def generate_corpus_from_folder(folder_path):
             corpus[top.split(os.path.sep)[-1]] = globals()[top.split(os.path.sep)[-1]]
     return corpus
 
+# TODO: improve this
 def syllablesplit(input):
+    """Estimates the number of syllables in a word, by counting the number of vowels."""
     nb_syllabes = 0
     syllables='aeiouy'
     for char in input:
@@ -57,7 +60,8 @@ def syllablesplit(input):
     return nb_syllabes
 
 
-#The following function provides a better estimator, but is unused as it is not accurate enough.
+# The following function provides a better estimator since it does not count vowels that are preceded by another vowel, but is unused as it is
+# still not accurate enough.
 #def bettersyllablesplit(input):
 #    nb_syllabes = 0
 #    syllables='aeiouy'
@@ -75,6 +79,16 @@ def syllablesplit(input):
 
 
 def convert_text_to_string(text):
+    """When given a possible text as an input, this forcibly converts it to a single string
+    
+    Types of possible inputs :
+    * Text is already a string, in this case, the function simply returns the text.
+    * If the text is composed of sentences, which have been split into tokens : the function takes care of concatening tokens and sentences.
+    * If the text is composed of sentences, that have not been split into tokens, the function takes care of concatening sentences.
+
+    :return: A text, which has been converted into a single string.
+    :rtype: str:
+    """
     if isinstance(text, str):
         doc = text
 
@@ -88,6 +102,16 @@ def convert_text_to_string(text):
     return doc
 
 def convert_text_to_sentences(text,nlp):
+    """When given a possible text as an input, this forcibly converts it to sentences, further split into tokens.
+    
+    Types of possible inputs :
+    * Text is already a string, in this case, the function splits the text into sentences, and tokenizes each of them.
+    * If the text is composed of sentences, which have been split into tokens : the function simply returns the text
+    * If the text is composed of sentences, that have not been split into tokens, the function tokenizes each sentence.
+
+    :return: A text, which has been converted into a single string.
+    :rtype: str:
+    """
     # Convert string to list(list(str))
     if isinstance(text, str):
         text = [[token.text for token in sent] for sent in nlp(text).sents]
@@ -103,7 +127,13 @@ def convert_text_to_sentences(text,nlp):
     return text
 
 def convert_corpus_to_list(corpus):
-    """Converts a dict[class][text][sentence][token] structure into list(str), also returning associated label in a list with same indexes."""
+    """
+    Converts a dict[class][text][sentence][token] structure into two lists, one containing the texts, and the other containing their label.    
+    
+    :returns:
+        - corpus_as_list (py:class:list(str)) - Lists each text in a tokenized format, and split by sentences.
+        - labels (py:class:list(str)) - Denotes to which class the text belonging to a certain index belongs to
+    """
     corpus_as_list=list()
     labels = list()
     if isinstance(corpus, parsed_collection.ParsedCollection):
@@ -126,6 +156,7 @@ def convert_corpus_to_list(corpus):
     return corpus_as_list, labels
 
 def group_words_in_sentences(text):
+    """Used for compatibility with other functions. Returns a list of sentences, where words have been concatenated into a single string."""
     doc = []
     for sentence in text:
         doc.append(' '.join(sentence))
@@ -139,8 +170,9 @@ def count_occurences_in_document(text, spacy_filter, nlp=None, mode="text"):
     :type text: str or list(list(str))
     :param nlp: What natural language processor to use, currently only spacy is supported.
     :type nlp: spacy.lang
-    :param string mode: What value to return, old20 or pld20.
-    :return: Number of pronouns in a text, or average number of pronouns per sentence for this text
+    :param spacy_filter: A comprehension list containing a filtered text after applying a spacy model.
+    :param string mode: Whether to count for the entire text, or to normalize by sentences.
+    :return: Number of occurences of something in a text, or average number of something per sentence for this text.
     :rtype: float
     """
     if mode == "sentence":
@@ -162,6 +194,7 @@ def count_occurences_in_document(text, spacy_filter, nlp=None, mode="text"):
 
 
 def load_dependency(dependency_name, nlp_processor=None):
+    """TODO"""
     if dependency_name == "GPT2_LM":
         print("importing GPT2 model..")
         model_name = "asi/gpt-fr-cased-small"

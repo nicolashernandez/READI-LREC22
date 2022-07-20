@@ -110,12 +110,23 @@ def demo_doMethods(corpus, plot=False):
     
     print(metrics.classification_report(y, y_pred, target_names=corpus_label_names))
 
-################Do these once reproducing paper is over################
+################End of functions used solely for reproducing READI paper content################
 
 #Configuration :
 
 #Using a specific model :
 def classify_corpus_MLP(corpus, plot=False):
+    """
+    Uses a MLP (Multilayer perceptron) model to classify a given collection of texts.
+
+    While not directly related to readability, this can be used to exploit the features acquired from research into readability, to try and see
+    if these can correlate with readability one way or another.
+
+    :param bool plot: Whether to graphically output the results to the current user's terminal or application.
+    :return: a string showing relevant metrics after performing a text classification task.
+    :rtype: sklearn.metrics.classification_report
+    """
+        
     if isinstance(corpus, parsed_collection.ParsedCollection):
         corpus_label_names = corpus.content.keys()
     else:
@@ -146,6 +157,16 @@ def classify_corpus_MLP(corpus, plot=False):
     return metrics.classification_report(y, y_pred, target_names=corpus_label_names)
 
 def classify_corpus_SVM(corpus, plot=False):
+    """
+    Uses a SVM (Support Vector Machine) model to classify the given collection of texts.
+
+    While not directly related to readability, this can be used to exploit the features acquired from research into readability, to try and see
+    if these can correlate with readability one way or another.
+
+    :param bool plot: Whether to graphically output the results to the current user's terminal or application.
+    :return: a string showing relevant metrics after performing a text classification task.
+    :rtype: sklearn.metrics.classification_report
+    """
     if isinstance(corpus, parsed_collection.ParsedCollection):
         corpus_label_names = corpus.content.keys()
     else:

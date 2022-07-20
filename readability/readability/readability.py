@@ -14,6 +14,7 @@ Furthermore, parsed collections can use additional functions that necessitate mu
 Please view the rest of the documentation for more details. 
 """
 
+from dis import disco
 import spacy
 from .utils import utils
 from .stats import diversity, perplexity, common_scores, word_list_based, syntactic, discourse, rsrs
@@ -118,9 +119,11 @@ class Readability:
             entity_density=dict(function=self.entity_density,dependencies=["coreferee"],default_arguments=dict(unique=False)),
             referring_entity_ratio=dict(function=self.proportion_referring_entity,dependencies=["coreferee"],default_arguments=dict()),
             average_entity_word_length=dict(function=self.average_word_length_per_entity,dependencies=["coreferee"],default_arguments=dict()),
-            count_type_mention=dict(function=self.count_type_mention,dependencies=["coreferee"],default_arguments=dict(mention_type="proper_name")),
-            count_type_opening=dict(function=self.count_type_opening,dependencies=["coreferee"],default_arguments=dict(mention_type="proper_name"))
-            #following aren't implemented yet:
+            average_length_reference_chain=dict(function=self.average_length_reference_chain,dependencies=["coreferee"],default_arguments=dict())
+
+            #following aren't implemented yet, or are being tested:
+            #count_type_mention=dict(function=self.count_type_mention,dependencies=["coreferee"],default_arguments=dict(mention_type="proper_name")),
+            #count_type_opening=dict(function=self.count_type_opening,dependencies=["coreferee"],default_arguments=dict(mention_type="proper_name"))
             #rsrs=dict(function=self.stub_rsrs,dependencies=["GPT2_LM"]),
             
             # TODO: These are meant to be used with a corpus only, so they should appear for a ParsedCollection instance, but not ParsedText.
@@ -438,14 +441,17 @@ class Readability:
 
     def lexical_cohesion_tfidf(self, content, mode="text"):
         """
-        Returns the average cosine similarity between adjacent sentences in a text.
+        Returns the average cosine similarity between adjacent sentences in a text after TFIDF representation.
 
-        By using the 'mode' parameter, can use inflected forms of tokens or the corresponding lemmas, possibly filtering the text beforehand
+        This can be done by representing the contents of each sentence in a term frequency-inverse document frequency matrix,
+        and using that to calculate the cosine similarity between each represented sentence.
+
+        By using the 'mode' parameter, can use inflected forms of tokens or their lemmas, possibly filtering the text beforehand
         in order to keep only nouns, proper names, and pronouns.
         Valid values for mode are : 'text', 'lemma', 'subgroup_text', 'subgroup_lemma'.
 
         :param str mode: Whether to filter the text, and whether to use raw texts or lemmas.
-        :return: a ratio of words in the current text, that appear in the Dubois-Buyse word list.
+        :return: Average of cosine similarity between each adjacent sentence [i, i+1]
         :rtype: float
         """
         if not self.check_score_and_dependencies_available("cosine_similarity_tfidf"):
@@ -456,10 +462,19 @@ class Readability:
     # NOTE: this seems to output the same values, whether we use text or lemmas, probably due to the type of model used.
     def lexical_cohesion_LDA(self, content, mode="text"):
         """
-        Returns the average cosine similarity between adjacent sentences in a text.
+        Returns the average cosine similarity between adjacent sentences in a text by using a Latent Dirichlet allocation.
+
+        This is a step further than the TFIDF method since this instead relates "topics" together instead of simply indicating
+        whether two sentences share some exact words.
+        This is done thanks to GenSim and Word2Vec : By first converting a text's sentences into BOW vectors,
+        then by using the model to see if two adjacent sentences share the same topics.
         
-        By using the 'mode' parameter, can use inflected forms of words or their lemmas.
+        By using the 'mode' parameter, can use inflected forms of tokens or their lemmas.
         Valid values for mode are : 'text', 'lemma'.
+        
+        :param str mode: Whether to filter the text, and whether to use raw texts or lemmas.
+        :return: Average of cosine similarity between each adjacent sentence [i, i+1]
+        :rtype: float
         """
         if not self.check_score_and_dependencies_available("cosine_similarity_LDA"):
             raise RuntimeError("measure 'cosine_similarity_LDA' cannot be calculated.")
@@ -467,43 +482,97 @@ class Readability:
         return func(self.dependencies["fauconnier_model"],content,self.nlp,mode)
 
     def entity_density(self,content,unique=False):
+        """
+        Entity density is the number of all or unique entities in document, divided by text length.
+        
+        :param bool unique: Whether to return proportion of all entities in document, or only unique entities.
+        """
         if not self.check_score_and_dependencies_available("entity_density"):
             raise RuntimeError("measure", "entity_density", "cannot be calculated.")
         func = discourse.entity_density
         return func(content,self.nlp,unique)
 
     def unique_entity_density(self,content):
+        """Returns number of unique entities in document, divided by text length."""
         return self.entity_density(content=content,unique=True)
 
     def proportion_referring_entity(self,content):
+        """Returns amount of anaphoric mentions in text : Mentions of an entity except for the entity itself."""
         if not self.check_score_and_dependencies_available("referring_entity_ratio"):
             raise RuntimeError("measure", "referring_entity_ratio", "cannot be calculated.")
         func = discourse.proportion_referring_entity
         return func(content,self.nlp)
 
-    def average_word_length_per_entity(self,content):
+    def average_entity_word_length(self,content):
+        """Returns average word length of each entity."""
         if not self.check_score_and_dependencies_available("average_entity_word_length"):
             raise RuntimeError("measure", "average_entity_word_length", "cannot be calculated.")
-        func = discourse.average_word_length_per_entity
+        func = discourse.average_entity_word_length
+        return func(content,self.nlp)
+
+    def average_length_reference_chain(self,content):
+        """Counts number of mentions appearing in coreference chains, and returns the average."""
+        if not self.check_score_and_dependencies_available("average_length_reference_chain"):
+            raise RuntimeError("measure", "average_length_reference_chain", "cannot be calculated.")
+        func = discourse.average_length_reference_chain
         return func(content,self.nlp)
 
     def count_type_mention(self,content,mention_type="proper_name"):
+        """
+        Returns the ratio of a specific type of mention in a text per coreference chain.
+
+        As of now, the recognized mention types are :
+        * indefinite_NP
+        * definite_NP
+        * NP_without_determiner
+        * possessive_determiner
+        * demonstrative_determiner
+        * proper_name
+        * reflexive_pronoun
+        * relative_pronoun
+        * demonstrative_pronoun
+
+        :param str mention_type: Denotes the type of mention to be recognized. 
+        :return: Amount of times a specific type of mention appears in a text, divided by the number of coreference chains.
+        :rtype: float
+        """
         if not self.check_score_and_dependencies_available("count_type_mention"):
             raise RuntimeError("measure", "count_type_mention", "cannot be calculated.")
         func = discourse.count_type_mention
         return func(content,mention_type,self.nlp)
     
-    #TODO : finish listing each possible variant one by one..
+    #TODO : finish listing each possible variant one by one.
     def count_type_mention_proper_name(self,content):
+        """Returns the ratio of proper names for each mention in a text's coreference chains."""
         return self.count_type_mention(content,"proper_name")
 
     def count_type_opening(self,content,mention_type="proper_name"):
+        """
+        Returns the ratio of a specific type of mention in a text for the first mention, which usually introduces the entity, per coreference chain.
+
+        As of now, the recognized mention types are :
+        * indefinite_NP
+        * definite_NP
+        * NP_without_determiner
+        * possessive_determiner
+        * demonstrative_determiner
+        * proper_name
+        * reflexive_pronoun
+        * relative_pronoun
+        * demonstrative_pronoun
+
+        :param str mention_type: Denotes the type of mention to be recognized. 
+        :return: Amount of times a specific type of mention appears in a text, divided by the number of coreference chains.
+        :rtype: float
+        """
         if not self.check_score_and_dependencies_available("count_type_opening"):
             raise RuntimeError("measure", "count_type_opening", "cannot be calculated.")
         func = discourse.count_type_opening
         return func(content,mention_type,self.nlp)
 
+    #TODO : finish listing each possible variant one by one..
     def count_type_opening_proper_name(self,content):
+        """Returns the ratio of proper names for each starting mention in a text's coreference chains."""
         return self.count_type_opening(content,"proper_name")
 
 
@@ -511,6 +580,17 @@ class Readability:
     # Measures obtained from Machine Learning models :
     # TODO: allow user to optionally also use currently known features from other methods(common_scores, text diversity, etc..)
     def corpus_classify_ML(self,model_name,collection,plot=False):
+        """
+        When given a collection of texts, this calls the underlying functions needed to use a Machine Learning model for a classification task.
+
+        While not directly related to readability, this can be used to exploit the features acquired from research into readability, to try and see
+        if these can correlate with readability one way or another.
+
+        :param str model_name: What kind of machine learning model to use.
+        :param bool plot: Whether to graphically output the results to the current user's terminal or application.
+        :return: a string showing relevant metrics after performing a text classification task.
+        :rtype: sklearn.metrics.classification_report
+        """
         if model_name == "SVM":
             func = methods.classify_corpus_SVM
         elif model_name == "MLP":
@@ -545,19 +625,41 @@ class Readability:
 
     # Machine Learning applications:
     def classify_corpus_SVM(self ,collection, plot=False):
+        """Uses a SVM (Support Vector Machine) model to classify the given collection of texts."""
         return self.corpus_classify_ML("SVM",collection,plot)
 
     def classify_corpus_MLP(self, collection, plot=False):
+        """Uses a MLP (Multilayer perceptron) model to classify the given collection of texts."""
         return self.corpus_classify_ML("MLP",collection,plot)
 
     def compare_ML_models(self, collection, plot=True):
+        """
+        Uses several popular Machine Learning models to classify the given collection of texts, to show which ones currently performs the best.
+
+        Uses a Random Forest Classifier, a SVM (Support Vector Machine) model, a Multinomial Naive Bayes model, Logistic Regression, and a Multilayer
+        perceptron to see which ones currently performs the text classifiction task the best.
+        """
         return self.corpus_classify_ML("compare",collection,plot)
 
-    # Deep Learning applications: 
+    # Deep Learning applications:
     def classify_corpus_fasttext(self, collection, model_name = "fasttext"):
+        """
+        Imports, configures, and trains a fastText model.
+
+        :param corpus: Data input, preferably as a dict(class_label:list(text))
+        :param str model_name: Choice of language model to use : fasttext, bigru, nbsvm
+        :return: Classification task metrics, as detailed in .models.compute_evaluation_metrics()
+        """
         func = fasttext.classify_corpus_fasttext
         return func(collection, model_name)
         
     def classify_corpus_BERT(self, collection, model_name = "camembert-base"):
+        """
+        Imports, configures, and trains a BERT model.
+        
+        :param corpus: Data input, preferably as a dict(class_label:list(text))
+        :param str model_name: Choice of language model to use : bert-base-multilingual-cased, camembert-base, flaubert/flaubert_base_cased
+        :return: Classification task metrics, as detailed in .models.compute_evaluation_metrics()
+        """
         func = bert.classify_corpus_BERT
         return func(collection, model_name)
