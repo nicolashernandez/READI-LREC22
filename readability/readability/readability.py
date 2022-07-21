@@ -110,15 +110,15 @@ class Readability:
             ttr=dict(function=self.ttr,dependencies=[],default_arguments=dict(formula_type = "default")),
             ntr=dict(function=self.ntr,dependencies=[],default_arguments=dict(formula_type = "default")),
 
-            dubois_buyse_ratio=dict(function=self.dubois_proportion,dependencies=["dubois_dataframe"],default_arguments=dict(filter_type="total",filter_value=None)),
+            dubois_buyse_ratio=dict(function=self.dubois_buyse_ratio,dependencies=["dubois_dataframe"],default_arguments=dict(filter_type="total",filter_value=None)),
             old20=dict(function=self.old20,dependencies=["lexique_dataframe"],default_arguments=dict()),
             pld20=dict(function=self.pld20,dependencies=["lexique_dataframe"],default_arguments=dict()),
             
             cosine_similarity_tfidf=dict(function=self.lexical_cohesion_tfidf,dependencies=[],default_arguments=dict(mode="text")),
             cosine_similarity_LDA=dict(function=self.lexical_cohesion_LDA,dependencies=["fauconnier_model"],default_arguments=dict(mode="text")),
             entity_density=dict(function=self.entity_density,dependencies=["coreferee"],default_arguments=dict(unique=False)),
-            referring_entity_ratio=dict(function=self.proportion_referring_entity,dependencies=["coreferee"],default_arguments=dict()),
-            average_entity_word_length=dict(function=self.average_word_length_per_entity,dependencies=["coreferee"],default_arguments=dict()),
+            referring_entity_ratio=dict(function=self.referring_entity_ratio,dependencies=["coreferee"],default_arguments=dict()),
+            average_entity_word_length=dict(function=self.average_entity_word_length,dependencies=["coreferee"],default_arguments=dict()),
             average_length_reference_chain=dict(function=self.average_length_reference_chain,dependencies=["coreferee"],default_arguments=dict())
 
             #following aren't implemented yet, or are being tested:
@@ -217,8 +217,8 @@ class Readability:
                 if dependency not in list(self.dependencies.keys()):
                     self.dependencies[dependency] = utils.load_dependency(dependency,self.nlp)
 
+        # Check if it's in self.informations to warn user it's already loaded
         elif value in list(self.informations.keys()):
-            # Check if it's in self.informations to warn user it's already loaded
             print("No need to call .load(",value,"), value already exists in instance.informations[",value,"]",sep="")
             print(self.informations[value])
         else:
@@ -228,26 +228,32 @@ class Readability:
     def check_score_and_dependencies_available(self,score_name):
         """Indicates whether a measure or value has been excluded, and if its dependencies are available."""
         if score_name not in list(self.informations.keys()):
-            print("Value", score_name, "was not found in instance.informations. Please check if you excluded it when initializing the ReadabilityProcessor.")            
+            print("Name of score:", score_name, "was not found in instance.informations. Please check if you excluded it when initializing the ReadabilityProcessor.")            
             return False
         else:
             if score_name in list(self.informations.keys()):
-                dependencies = self.informations[score_name]["dependencies"]
+                dependencies_to_check = self.informations[score_name]["dependencies"]
             else:
-                dependencies = self.excluded_informations[score_name]["dependencies"]
-            for dependency_name in dependencies:
+                dependencies_to_check = self.excluded_informations[score_name]["dependencies"]
+            for dependency_name in dependencies_to_check:
                 if dependency_name not in list(self.dependencies.keys()):
                     print("Dependency", dependency_name, "was not found in instance.dependencies. Something's gone wrong")
                     return False
         return True
 
 
-    # Traditional measures: 
+    # Traditional measures:
+    # TODO: change name to traditional_score or common_score in order to avoid confusion.
     def score(self, name, content, statistics = None):
         """
-        Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
-        Please refer to this paper for more details : https://doi.org/10.18653%252Fv1%252F2020.acl-main.240
+        Acts as way to call functions in submodule in stats/common_scores.
 
+        Which function is called is determined by the 'name' argument, and the text to evaluate must be passed as the 'content' argument.
+        Also, if using an instance of ParsedText or ParsedCollection, the statistics parameter will be used to avoid calculating
+        part of the scores multiple times.
+
+        :param str name: Which score to use: lowercase acronyms only.
+        :param dict statistics: Supplied by a ParsedText instance, contains a bunch of pre-calculated values to avoid duplicate calculation.
         :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
         :rtype: float
         """
@@ -341,6 +347,7 @@ class Readability:
         return perplexity.PPPL_score(self.dependencies["GPT2_LM"],content)
     
     def stub_rsrs():
+        """Not implemented yet, please check submodule stats/rsrs for implementation details."""
         #TODO : check submodule stats/rsrs for implementation details
         print("not implemented yet")
         return -1
@@ -378,7 +385,7 @@ class Readability:
         return self.diversity(content, "ntr",formula_type)
 
     # Measures based on pre-existing word lists
-    def dubois_proportion(self, content, filter_type = "total", filter_value = None):
+    def dubois_buyse_ratio(self, content, filter_type = "total", filter_value = None):
         """
         Outputs the proportion of words included in the Dubois-Buyse word list.
         Can specify the ratio for words appearing in specific echelons, ages, or three-year cycles.
@@ -389,7 +396,7 @@ class Readability:
         :return: a ratio of words in the current text, that appear in the Dubois-Buyse word list.
         :rtype: float
         """
-        func = word_list_based.dubois_proportion
+        func = word_list_based.dubois_buyse_ratio
         if not self.check_score_and_dependencies_available("dubois_buyse_ratio"):
             raise RuntimeError("measure 'dubois_buyse_ratio' cannot be calculated.")
         return func(self.dependencies["dubois_dataframe"]["dataframe"], content, self.nlp, filter_type, filter_value)
@@ -496,11 +503,11 @@ class Readability:
         """Returns number of unique entities in document, divided by text length."""
         return self.entity_density(content=content,unique=True)
 
-    def proportion_referring_entity(self,content):
+    def referring_entity_ratio(self,content):
         """Returns amount of anaphoric mentions in text : Mentions of an entity except for the entity itself."""
         if not self.check_score_and_dependencies_available("referring_entity_ratio"):
             raise RuntimeError("measure", "referring_entity_ratio", "cannot be calculated.")
-        func = discourse.proportion_referring_entity
+        func = discourse.referring_entity_ratio
         return func(content,self.nlp)
 
     def average_entity_word_length(self,content):
@@ -536,8 +543,8 @@ class Readability:
         :return: Amount of times a specific type of mention appears in a text, divided by the number of coreference chains.
         :rtype: float
         """
-        if not self.check_score_and_dependencies_available("count_type_mention"):
-            raise RuntimeError("measure", "count_type_mention", "cannot be calculated.")
+        #if not self.check_score_and_dependencies_available("count_type_mention"):
+        #    raise RuntimeError("measure", "count_type_mention", "cannot be calculated.")
         func = discourse.count_type_mention
         return func(content,mention_type,self.nlp)
     
@@ -565,8 +572,8 @@ class Readability:
         :return: Amount of times a specific type of mention appears in a text, divided by the number of coreference chains.
         :rtype: float
         """
-        if not self.check_score_and_dependencies_available("count_type_opening"):
-            raise RuntimeError("measure", "count_type_opening", "cannot be calculated.")
+        #if not self.check_score_and_dependencies_available("count_type_opening"):
+        #    raise RuntimeError("measure", "count_type_opening", "cannot be calculated.")
         func = discourse.count_type_opening
         return func(content,mention_type,self.nlp)
 
@@ -624,7 +631,7 @@ class Readability:
         return None
 
     # Machine Learning applications:
-    def classify_corpus_SVM(self ,collection, plot=False):
+    def classify_corpus_SVM(self, collection, plot=False):
         """Uses a SVM (Support Vector Machine) model to classify the given collection of texts."""
         return self.corpus_classify_ML("SVM",collection,plot)
 

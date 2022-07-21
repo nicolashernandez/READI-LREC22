@@ -1,7 +1,5 @@
 """
-The ParsedCollection module is a convenient way to group ParsedTexts together and enable functions that require group(s) of text by the processor.
-
-Tentative structure is to make it a dict{list(ParsedText)} but for now let's just make it a list of texts and see what we can do.
+The ParsedCollection module is a convenient way to group ParsedTexts together and enable additional functions that require group(s) of text by the processor.
 """
 import copy
 import math
@@ -15,18 +13,27 @@ class ParsedCollection:
     """
     The ParsedCollection class serves as a convenient way to group ParsedText together and access relevant ReadabilityProcessor functions.
 
-    Might be created as a result of ReadabilityProcessor.parseCollection(), or might be instantiated on its own. Not sure for now.
+    It is meant to be created as a result of ReadabilityProcessor.parseCollection() since it depends on a ReadabilityProcessor in order to access functions,
+    and also supposes that each text stored is actually an instance of ParsedText.
+
+    List of methods : __init__, call_score(), show_available_scores(), show_scores(), show_statistics(), remove_outliers()
+    It also contains accessor functions based on ReadabilityProcessor methods, sharing the same name, these use the helper function call_score() in order to work.
+    List of attributes : content, readability_processor, statistics, scores
     """
     def __init__(self, text_collection, readability_processor):
         """
-        Constructor of the ParsedCollection class, creates the following attributes:
-        self.readability_processor, self.content, self.scores, self.statistics
-        However, none of the scores in self.scores will be initialized.
-        We're supposing that texts are already in ParsedText(format).
+        Constructor of the ParsedCollection class, creates the 'content', 'scores', 'statistics', and 'readability_processor' attributes.
+
+        Keep in mind that the scores default to None since they haven't been calculated yet.
+
+        :param dict(ParsedText) content: Structure associating labels with their associated texts. Defaults to a single dummy label called 'label0' if none are provided.
+        :param dict scores: Language the text was written in, in order to adapt some scores.
+        :param dict statistics: Common values used by various measures (Such as number of words, number of sentences, etc)
+        :param str nlp: Type of NLP processor to use, indicated by a "type_subtype" string.
+        :param ReadabilityProcessor readability_processor: Type of processor to use for the calculation of pseudo-perplexity
         """
         self.readability_processor = readability_processor
         self.content = text_collection
-        self.corpus_name = "unused"
 
         # Initialize scores by setting them all to None
         self.scores = dict()
@@ -59,11 +66,9 @@ class ParsedCollection:
             self.statistics[label]["meanSentences"] = round(self.statistics[label]["totalSentences"] / len(self.content[label]),1)
             self.statistics[label]["meanTokens"] = round(self.statistics[label]["totalWords"] / len(self.content[label]),1)
 
-    
     def show_statistics(self):
         """
-        Prints to the console the contents of the statistics obtained for a text, or part of the statistics for a corpus.
-        In this case, this will output the mean values of each score for each class.
+        Prints to the console the contents of the statistics for each class of text.
         """
         for label in list(self.content.keys()):
             print(label + "------------------")
@@ -73,12 +78,15 @@ class ParsedCollection:
                 else:
                     print(stat, "=", self.statistics[label][stat])
 
-    def remove_outliers(self,score_type = None, stddevratio=1):
+    def remove_outliers(self, score_type = None, stddevratio=1):
         """
         Outputs a corpus, after removing texts which are considered to be "outliers", based on a standard deviation ratio.
         A text is an outlier if its value is lower or higher than this : mean +- standard_deviation * ratio
-        In order to exploit this new corpus, you'll need to make a new Readability instance.
-        For instance : new_r = Readability(r.remove_outliers(r.perplexity(),1))
+        In order to exploit this new corpus, you'll need to make to parse the collection again.
+        For instance : collection_without_GFI_outliers = ReadabilityProcessor.parseCollection(original_collection).remove_outliers("gfi",1)
+
+        :param str score_type: A score type that can be recognized by the helpre function call_score (which relies on a ReadabilityProcessor's 'informations' attribute)
+        :param float stddevratio: A number representing to which extent can be a value be tolerated before it is detected as an outlier: Less than mean - ratio, or more than mean + ratio.
 
         :return: a corpus, in a specific format where texts are represented as lists of sentences, which are lists of words.
         :rtype: dict[str][str][str][str]
@@ -112,12 +120,17 @@ class ParsedCollection:
     def call_score(self,score_name, arguments=None, force=False, iterable_arguments=None):
         """
         Helper function that gets a score if it already exists, otherwise checks if it's available, if so call the relevant function from the ReadabilityProcessor
+        
         Use of function is : instance.call_score("score_name", arguments:[arg1,arg2,argi..], force:bool)
         If the underlying function needs no additional arguments, just pass en empty list, e.g : instance.call_score("pppl",[],True)
+        Additionally, the function to be called can possibly use something that changes per class, or text in order to speed up the process.
+        In this case, when using call_score, please pass these values in the argument 'iterable_arguments'
+        as a list of lists, each list containing the values of the ith iterable argument for all texts.
 
         :param str score_name: Name of a score recognized by ReadabilityProcessor.informations.
         :param list(any) arguments: Values used to change behavior of underlying functions.
         :param bool force: Indicates whether to force the calculation of a score or not.
+        :param list(list(any)) iterable_arguments: Additional values used to change behavior of underlying functions, on a text-by-text basis.
         """
         moy_score = dict()
         # Check if measure already calculated
@@ -134,7 +147,7 @@ class ParsedCollection:
                 else:
                     for index,text in enumerate(self.content[label]):
                         # Append every ith iterable argument to the permanent arguments (even if none are supplied)
-                        # NOTE: this breaks if arguments is None, remember to supply an empty list instead.
+                        # NOTE: this breaks if arguments is None, remember to make sure arguments is an empty list instead.
                         moy += text.call_score(score_name,arguments + list(list(zip(*iterable_arguments))[index]),force)
                 self.scores[score_name][label] = moy / len(self.content[label])
                 moy_score[label] = self.scores[score_name][label]
@@ -143,6 +156,12 @@ class ParsedCollection:
         return moy_score
 
     def show_scores(self,force=False,correlation=None):
+        """
+        Returns a dataframe containing each calculated score, can force calculation with default values, and add a correlation coefficient.
+        
+        :param bool force: Indicates whether to force the calculation of each score
+        :param str correlation: What kind of correlation coefficient to add to the dataframe.
+        """
         if force:
             for score_name in list(self.scores.keys()):
                 self.scores[score_name] = self.call_score(score_name, force=True)
@@ -175,9 +194,18 @@ class ParsedCollection:
         df.index = score_names
         return df
     
-
+    def show_available_scores(self):
+        """Prints currently 'available' scores' names in a list"""
+        return list(self.scores.keys())
+    
     # Traditional measures :
     def traditional_score(self,score_name, force=False):
+        """
+        Called by methods : gfi | ari | fre | fkgl | smog | rel. Serves as a entry-point to function "traditional_score" of ReadabilityProcessor.
+        
+        :param str score_name: Name of a score recognized by ReadabilityProcessor.informations.
+        :param bool force: Indicates whether to force the calculation of a score or not.
+        """
         text_statistics = [[]]
         for label in list(self.content.keys()):
             for parsed_text in self.content[label]:
@@ -236,14 +264,34 @@ class ParsedCollection:
 
     # Measures related to perplexity
     def perplexity(self,force=False):
+        """
+        Outputs pseudo-perplexity, which is derived from pseudo-log-likelihood scores.
+        Please refer to this paper for more details : https://doi.org/10.18653%252Fv1%252F2020.acl-main.240
+
+        :param bool force: Indicates whether to force the calculation of a score or not.
+        :return: The pseudo-perplexity measure for a text, or for each text in a corpus.
+        :rtype: float
+        """
         return self.call_score("pppl",[],force)
     
     def stub_rsrs(self,force=False):
-        return self.call_score("rsrs",[],force)
+        """Not implemented yet, please check submodule stats/rsrs for implementation details."""
+        #TODO : check submodule stats/rsrs for implementation details
+        return(self.call_score("rsrs",[],force))
 
 
     # Measures related to text diversity
     def diversity(self, ratio_type, formula_type=None, force=False):
+        """
+        Outputs a measure of text diversity based on which feature to use, and which version of the formula is used.
+        Default formula is 'nb lexical items' / 'nb unique lexical items',
+        'root' formula uses the square root for the denominator,
+        'corrected' formula mutliplies the number of words by two before taking the square root for the denominator.
+
+        :param str ratio_type: Which text diversity measure to use: "ttr" is text token ratio, "ntr" is noun token ratio
+        :param str formula_type: What kind of formula to use: "corrected", "root", and default standard are available for token ratios.
+        :param bool force: Indicates whether to force the calculation of a score or not.
+        """
         return self.call_score(ratio_type,[formula_type],force)
 
     def ttr(self, formula_type=None, force=False):
@@ -256,63 +304,111 @@ class ParsedCollection:
     
 
     # Measures based on pre-existing word lists
-    def dubois_proportion(self,filter_type="total",filter_value=None, force=False):
+    def dubois_buyse_ratio(self,filter_type="total",filter_value=None, force=False):
+        """
+        Outputs the proportion of words included in the Dubois-Buyse word list.
+        Can specify the ratio for words appearing in specific echelons, ages or three-year cycles.
+
+        :param str filter_type: Which variable to use to filter the word list : 'echelon', 'age', or 'cycle'
+        :param str filter_value: Value (or iterable containing two values) for subsetting the word list.
+        :type filter_value: Union[int, tuple, list]
+        :param bool force: Indicates whether to force the calculation of a score or not.
+        :return: a ratio of words in the current text, that appear in the Dubois-Buyse word list.
+        :rtype: float
+        """
         return self.call_score("dubois_buyse_ratio",[filter_type, filter_value],force)
 
     def average_levenshtein_distance(self,mode="old20", force=False):
+        """
+        Returns the average Orthographic Levenshtein Distance 20 (OLD20), or its phonemic equivalent (PLD20).
+        Currently using the Lexique 3.0 database for French texts, version 3.83. More details here : http://www.lexique.org/
+        OLD20 is an alternative to the orthographical neighbourhood index that has been shown to correlate with text difficulty.
+
+        :param str mode: What kind of value to return, OLD20 or PLD20.
+        :param bool force: Indicates whether to force the calculation of a score or not.
+        :return: Average of OLD20 or PLD20 for each word in current text
+        :rtype: Union[float,dict[str][list(float)]]
+        """
         return self.call_score(mode,[],force)
     
-    def old20(self, formula_type=None, force=False):
+    def old20(self, force=False):
         """Returns average Orthographic Levenshtein Distance 20 (OLD20) in a text"""
         return self.average_levenshtein_distance("old20", force)
 
-    def pld20(self, formula_type=None, force=False):
+    def pld20(self, force=False):
         """Returns average Phonemic Levenshtein Distance 20 (OLD20)"""
         return self.average_levenshtein_distance("pld20", force)
-    
-    # NOTE : might do these 3 at start-up instead.
-    #def count_pronouns(self,mode="text"):
-    #    if "nb_pronouns" in list(self.statistics.keys()):
-    #        if self.statistics["nb_pronouns"] == None:
-    #            self.statistics["nb_pronouns"] = self.readability_processor.count_pronouns(self.content,mode)
-    #    else: 
-    #        self.statistics["nb_pronouns"] = self.readability_processor.count_pronouns(self.content,mode)
-    #    return self.statistics["nb_pronouns"]
-    
-    #def count_articles(self,mode="text"):
-    #    if "nb_articles" in list(self.statistics.keys()):
-    #        if self.statistics["nb_articles"] == None:
-    #            self.statistics["nb_articles"] = self.readability_processor.count_articles(self.content,mode)
-    #    else: 
-    #        self.statistics["nb_articles"] = self.readability_processor.count_articles(self.content,mode)
-    #    return self.statistics["nb_articles"]
-        
-    #def count_proper_nouns(self,mode="text"):
-    #    if "nb_proper_nouns" in list(self.statistics.keys()):
-    #        if self.statistics["nb_proper_nouns"] == None:
-    #            self.statistics["nb_proper_nouns"] = self.readability_processor.count_proper_nouns(self.content,mode)
-    #    else: 
-    #        self.statistics["nb_proper_nouns"] = self.readability_processor.count_proper_nouns(self.content,mode)
-    #    return self.statistics["nb_proper_nouns"]
 
+
+    # Measures based on text cohesion
     def lexical_cohesion_tfidf(self, mode="text", force=False):
+        """
+        Returns the average cosine similarity between adjacent sentences in a text after TFIDF representation.
+
+        This can be done by representing the contents of each sentence in a term frequency-inverse document frequency matrix,
+        and using that to calculate the cosine similarity between each represented sentence.
+
+        By using the 'mode' parameter, can use inflected forms of tokens or their lemmas, possibly filtering the text beforehand
+        in order to keep only nouns, proper names, and pronouns.
+        Valid values for mode are : 'text', 'lemma', 'subgroup_text', 'subgroup_lemma'.
+
+        :param str mode: Whether to filter the text, and whether to use raw texts or lemmas.
+        :return: Average of cosine similarity between each adjacent sentence [i, i+1]
+        :rtype: float
+        """
         return self.call_score("cosine_similarity_tfidf",[mode],force)
 
     # NOTE: this seems to output the same values, whether we use text or lemmas, probably due to the type of model used.
-    def lexical_cohesion_LDA(self ,mode="text", force=False):
+    def lexical_cohesion_LDA(self, mode="text", force=False):
+        """
+        Returns the average cosine similarity between adjacent sentences in a text by using a Latent Dirichlet allocation.
+
+        This is a step further than the TFIDF method since this instead relates "topics" together instead of simply indicating
+        whether two sentences share some exact words.
+        This is done thanks to GenSim and Word2Vec : By first converting a text's sentences into BOW vectors,
+        then by using the model to see if two adjacent sentences share the same topics.
+        
+        By using the 'mode' parameter, can use inflected forms of tokens or their lemmas.
+        Valid values for mode are : 'text', 'lemma'.
+        
+        :param str mode: Whether to filter the text, and whether to use raw texts or lemmas.
+        :return: Average of cosine similarity between each adjacent sentence [i, i+1]
+        :rtype: float
+        """
         return self.call_score("cosine_similarity_LDA",[mode],force)
 
-    # Following functions are meant to be used with a corpus/collection of texts, while they could output a score such as mean accuracy,
-    # That would conflict with the scores that can be obtained with a text.. unless we do a corpus.informations attribute.. hmmm..
-    def classify_corpus_SVM(self):
-        return self.readability_processor.classify_corpus_SVM(self)
-    def classify_corpus_MLP(self):
-        return self.readability_processor.classify_corpus_MLP(self)
-    def compare_ML_models(self):
-        return self.readability_processor.compare_ML_models(self)
+    # Following functions can only be used with a collection of text.
+    def classify_corpus_SVM(self, plot=False):
+        """Uses a SVM (Support Vector Machine) model to classify the given collection of texts."""
+        return self.readability_processor.classify_corpus_SVM(self,plot)
+    def classify_corpus_MLP(self, plot=False):
+        """Uses a MLP (Multilayer perceptron) model to classify the given collection of texts."""
+        return self.readability_processor.classify_corpus_MLP(self,plot)
+    def compare_ML_models(self, plot=True):
+        """
+        Uses several popular Machine Learning models to classify the given collection of texts, to show which ones currently performs the best.
 
-    def classify_corpus_fasttext(self):
-        return self.readability_processor.classify_corpus_fasttext(self)
-    def classify_corpus_BERT(self):
-        return self.readability_processor.classify_corpus_BERT(self)
+        Uses a Random Forest Classifier, a SVM (Support Vector Machine) model, a Multinomial Naive Bayes model, Logistic Regression, and a Multilayer
+        perceptron to see which ones currently performs the text classifiction task the best.
+        """
+        return self.readability_processor.compare_ML_models(self,plot)
+
+    def classify_corpus_fasttext(self, model_name="fasttext"):
+        """
+        Imports, configures, and trains a fastText model.
+
+        :param corpus: Data input, preferably as a dict(class_label:list(text))
+        :param str model_name: Choice of language model to use : fasttext, bigru, nbsvm
+        :return: Classification task metrics, as detailed in .models.compute_evaluation_metrics()
+        """
+        return self.readability_processor.classify_corpus_fasttext(self, model_name)
+    def classify_corpus_BERT(self, model_name="camembert-base"):
+        """
+        Imports, configures, and trains a BERT model.
+        
+        :param corpus: Data input, preferably as a dict(class_label:list(text))
+        :param str model_name: Choice of language model to use : bert-base-multilingual-cased, camembert-base, flaubert/flaubert_base_cased
+        :return: Classification task metrics, as detailed in .models.compute_evaluation_metrics()
+        """
+        return self.readability_processor.classify_corpus_BERT(self, model_name)
 

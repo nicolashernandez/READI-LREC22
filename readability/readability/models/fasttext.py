@@ -6,10 +6,13 @@ import ktrain
 import os
 from ktrain import text
 
-
 def classify_corpus_fasttext(corpus, model_name = "fasttext"):
     """
     Imports, configures, and trains a fastText model.
+
+    fastText is a library meant to be used for converting words into vector representations called word embeddings.
+    In addition, the ktrain library is used as a wrapper over the deep learning library Tensorflow Keras to simplify the process.
+    This allows to train a text classifier based on fastText word embeddings.
 
     :param corpus: Data input, preferably as a dict(class_label:list(text))
     :param str model_name: Choice of language model to use : fasttext, bigru, nbsvm

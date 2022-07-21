@@ -10,9 +10,18 @@ import os
 def classify_corpus_BERT(corpus, model_name = "camembert-base", percent_train=90):
     """
     Imports, configures, and trains a BERT model.
+
+    BERT is a language whose acronym means Bidirectional Encoder Representation from Transformers.
+    At its core, BERT is a transformer, but it is different from the standard transformer architecture as follows:
+    Instead of sequentially reading a text input, BERT reads the entire sequence at once, which allows to learn context for a word in both directions,
+    instead of only knowing what comes before it.
+    In addition, the ktrain library is used as a wrapper over the deep learning library Tensorflow Keras to simplify the process.
+    Pre-trained BERT models used in the library are available via the HuggingFace community.
+    This allows to train a text classifier based on fastText word embeddings.
     
     :param corpus: Data input, preferably as a dict(class_label:list(text))
     :param str model_name: Choice of language model to use : bert-base-multilingual-cased, camembert-base, flaubert/flaubert_base_cased
+    :param int percent_train: What percent of text collection to use to fine-tune the pre-trained model.
     :return: Classification task metrics, as detailed in ..models.compute_evaluation_metrics() for more details
     """
     if isinstance(corpus, parsed_collection.ParsedCollection):
@@ -25,7 +34,7 @@ def classify_corpus_BERT(corpus, model_name = "camembert-base", percent_train=90
     results_summary = list()
     x, y = utils.convert_corpus_to_list(corpus)
 
-    # Need to de-tokenize texts, and probably better to let the transformer model do it itself.
+    # Need to de-tokenize texts, to let the transformer model do it itself with extra information.
     for index,text in enumerate(x):
         x[index] = " ".join(text)
 
@@ -235,4 +244,3 @@ def demo_doBert(name='ljl',test_flag = False):
             print ('\t&'+'\t&'.join(line)+'\\\\')
             print()
     return 0
-

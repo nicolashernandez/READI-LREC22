@@ -131,8 +131,8 @@ def convert_corpus_to_list(corpus):
     Converts a dict[class][text][sentence][token] structure into two lists, one containing the texts, and the other containing their label.    
     
     :returns:
-        - corpus_as_list (py:class:list(str)) - Lists each text in a tokenized format, and split by sentences.
-        - labels (py:class:list(str)) - Denotes to which class the text belonging to a certain index belongs to
+        - corpus_as_list (py:class:list(str)) - Lists each text as tokenized sentences.
+        - labels (py:class:list(str)) - List of indexes indicates to which class a text belongs to.
     """
     corpus_as_list=list()
     labels = list()
@@ -156,7 +156,7 @@ def convert_corpus_to_list(corpus):
     return corpus_as_list, labels
 
 def group_words_in_sentences(text):
-    """Used for compatibility with other functions. Returns a list of sentences, where words have been concatenated into a single string."""
+    """Used for compatibility with other functions. Converts a text into a list of sentences, where words have been concatenated into a single string."""
     doc = []
     for sentence in text:
         doc.append(' '.join(sentence))
@@ -194,7 +194,13 @@ def count_occurences_in_document(text, spacy_filter, nlp=None, mode="text"):
 
 
 def load_dependency(dependency_name, nlp_processor=None):
-    """TODO"""
+    """
+    Used by the readability processor: Loads a resource locally via disk or downloads via the internet (storing locally if possible)
+    
+    Information to be returned can be of any type, but it is preferred to use a dictionary in order to associate names and values.
+    These informations are meant to be stored in the readability processor as follows :
+    ReadabilityProcessor.dependencies[language_model_example] = utils.load_dependency("language_model_name")
+    """
     if dependency_name == "GPT2_LM":
         print("importing GPT2 model..")
         model_name = "asi/gpt-fr-cased-small"

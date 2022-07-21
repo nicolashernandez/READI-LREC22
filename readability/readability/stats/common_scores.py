@@ -1,11 +1,12 @@
 """
-The common_scores module contains functions allowing to calculate GFI, ARI, FRE, FKGL, SMOG, and REL.
-Can be improved by changing formulas/calculations depending on language.
+The common_scores module contains functions allowing to calculate readability scores that use simple formulas: GFI, ARI, FRE, FKGL, SMOG, and REL.
+
+The origin of these formulas, alongside a quick description of what they're meant to measure is presented in each function's documentation.
+Functions start with the uppercase acronym, and the suffix '_score'.
 """
 import math
-from unidecode import unidecode
 import pandas as pd
-from scipy.stats import pearsonr
+
 from ..utils import utils
 
 
@@ -23,7 +24,7 @@ def GFI_score(text, statistics=None):
     :return: The Gunning fog index of the current text
     :rtype: float
     """
-    #FIXME : this score is wrong since we divided by totalSentences instead of totalWords for the second ratio. Leaving as-is for now.
+    # FIXME : this score is wrong since we divided by totalSentences instead of totalWords for the second ratio. Leaving as-is for now.
     if statistics is not None:
         return 0.4*((statistics["totalWords"]/statistics["totalSentences"]) + 100*statistics["totalLongWords"]/statistics["totalSentences"])
     totalWords = 0

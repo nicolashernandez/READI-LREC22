@@ -1,8 +1,10 @@
 """
-The ParsedText class serves as an interface between a text and a readability_processor instance in order to store useful readability measures.
+The ParsedText module contains the ParsedText class, serving as an interface between a text and a readability_processor instance.
 
-It is meant to be created as a result of readability_processor.parse() since it uses the processor in order to know which measures are available, and
-have access to the resources necessary to calculate them.
+It is used to store various measures and calculations that can be used across a variety of formulas or applications, in order to speed up the process.
+Furthermore, it is used to store and access the services proposed by the library, such as text readability estimators, or testing machine learning models.
+This class is meant to be created as a result of ReadabilityProcessor.parse() since it uses the processor in order to know which measures are available, and
+have access to the external resources necessary to calculate them.
 """
 import copy
 import math
@@ -11,35 +13,28 @@ import pandas as pd
 import spacy
 from ..utils import utils
 
-# NOTE: There probably exists a better way to create an Statistics object as an attribute of ParsedText
-class Statistics:
-    pass
-
 class ParsedText:
     """
-    The ParsedText class serves as an interface between a text and a ReadabilityProcessor instance in order to store useful readability measures.
+    The ParsedText class serves as an interface between a text and a ReadabilityProcessor instance in order to store and output useful readability measures.
 
     It is meant to be created as a result of ReadabilityProcessor.parse() since it uses the processor in order to know which measures are available, and
     have access to the resources necessary to calculate them.
-    List of methods : __init__, show_text(), show_scores(), show_statistics().
-    It also contains callers to ReadabilityProcessor methods that will be of the same name, please refer to its documentation to know which ones.
+    List of methods : __init__, show_text(), call_score(), show_available_scores(), show_scores(), show_statistics().
+    It also contains accessor functions based on ReadabilityProcessor methods, sharing the same name, these use the helper function call_score() in order to work.
     List of attributes : content, readability_processor, statistics, scores
     """
     def __init__(self, content, readability_processor):
         """
-        Constructor of the ParsedText class, won't return any value but creates the attributes :
-        self.content, self.scores, self.statistics, self.readability_processor
-        However, none of the scores in self.scores will be initialized.
+        Constructor of the ParsedText class, creates the 'content', 'scores', 'statistics', and 'readability_processor' attributes.
+
+        Keep in mind that the scores default to None since they haven't been calculated yet.
 
         :param content: Content of a text.
         :type content: str, list(str), list(list(str)), converted into list(list(str))
-        :param scores: Language the text was written in, in order to adapt some scores.
-        :type scores: Probably a dict
-        :param statistics: Common values used by various measures (Such as number of words, number of sentences, etc)
-        :type statistics: Probably a dict
+        :param dict scores: Language the text was written in, in order to adapt some scores.
+        :param dict statistics: Common values used by various measures (Such as number of words, number of sentences, etc)
         :param str nlp: Type of NLP processor to use, indicated by a "type_subtype" string.
-        :param readability_processor: Type of processor to use for the calculation of pseudo-perplexity
-        :type readability_processor: ReadabilityProcessor
+        :param ReadabilityProcessor readability_processor: Type of processor to use for the calculation of pseudo-perplexity
         """
         self.readability_processor = readability_processor
 
@@ -80,23 +75,27 @@ class ParsedText:
     def show_statistics(self):
         """Prints to the console the contents of the statistics obtained for a text."""
         for stat in list(self.statistics.keys()):
-            print(stat, "=", self.statistics[stat])
+            if stat == "vocabulary":
+                print(stat, "=", len(self.statistics[stat]), "words")
+            else:
+                print(stat, "=", self.statistics[stat])
         return None
 
     def call_score(self, score_name, arguments=None, force=False):
         """
         Helper function that gets a score if it already exists, otherwise checks if it's available, if so call the relevant function from the ReadabilityProcessor
-        Use of function is : instance.call_score(score_name:str, arguments:list(argi), force:bool)
+        
+        Use of function is: instance.call_score(score_name:str, arguments:list(argi), force:bool)
         If the underlying function needs no additional arguments, just pass en empty list, e.g : instance.call_score("pppl",[],True)
 
         :param str score_name: Name of a score recognized by ReadabilityProcessor.informations.
         :param list(any) arguments: Values used to change behavior of underlying functions.
         :param bool force: Indicates whether to force the calculation of a score or not.
         """
-        # check if score_name already in scores:
+        # Check if score_name already in scores:
         if self.scores[score_name] is not None and not force:
             return self.scores[score_name]
-        # otherwise check if score_name is available in processor:
+        # Otherwise check if score_name is available in processor:
         elif self.readability_processor.check_score_and_dependencies_available(score_name):
             # If so, then call function based on informations and provided arguments (if any)
             func = self.readability_processor.informations[score_name]["function"]
@@ -112,11 +111,11 @@ class ParsedText:
 
     def show_scores(self,force=False):
         """
-        Returns a dataframe containing each already calculated score, can also force calculation with default values.
+        Returns a dataframe containing each calculated score, can force calculation with default values.
         
         :param bool force: Indicates whether to force the calculation of each score
         """
-        # NOTE: one behavior could be added : return every score if possible, and calculate the rest, instead of calculating everything.
+        # TODO: one behavior could be added : return every score if possible, and calculate the rest, instead of calculating everything.
         df = []
         if force:
             for score_name in list(self.scores.keys()):
@@ -126,15 +125,14 @@ class ParsedText:
         df = pd.DataFrame(df)
         return df
 
-    def show_possible_scores(self):
-        """Prints currently 'available' scores in a list"""
+    def show_available_scores(self):
+        """Prints currently 'available' scores' names in a list"""
         return list(self.scores.keys())
 
     # Traditional measures
-    
     def traditional_score(self,score_name,force=False):
         """
-        Called by methods : gfi | ari | fre | fkgl | smog | rel. Serves as a entry-point to the underlying function "score" of ReadabilityProcessor
+        Called by methods : gfi | ari | fre | fkgl | smog | rel. Serves as a entry-point to function "traditional_score" of ReadabilityProcessor.
         
         :param str score_name: Name of a score recognized by ReadabilityProcessor.informations.
         :param bool force: Indicates whether to force the calculation of a score or not.
@@ -203,6 +201,8 @@ class ParsedText:
         return(self.call_score("pppl",[],force))
     
     def stub_rsrs(self, force=False):
+        """Not implemented yet, please check submodule stats/rsrs for implementation details."""
+        #TODO : check submodule stats/rsrs for implementation details
         return(self.call_score("rsrs",[],force))
 
 
@@ -230,7 +230,7 @@ class ParsedText:
     
 
     # Measures based on pre-existing word lists
-    def dubois_proportion(self,filter_type="total", filter_value=None, force=False):
+    def dubois_buyse_ratio(self,filter_type="total", filter_value=None, force=False):
         """
         Outputs the proportion of words included in the Dubois-Buyse word list.
         Can specify the ratio for words appearing in specific echelons, ages or three-year cycles.
@@ -257,11 +257,11 @@ class ParsedText:
         """
         return self.call_score(mode,[],force)
 
-    def old20(self, formula_type=None, force=False):
+    def old20(self, force=False):
         """Returns average Orthographic Levenshtein Distance 20 (OLD20) in a text"""
         return self.average_levenshtein_distance("old20", force)
 
-    def pld20(self, formula_type=None, force=False):
+    def pld20(self, force=False):
         """Returns average Phonemic Levenshtein Distance 20 (OLD20)"""
         return self.average_levenshtein_distance("pld20", force)
 
@@ -269,6 +269,7 @@ class ParsedText:
     # Measures based on text cohesion
     # NOTE : might do the following 3 at start-up instead.
     def count_pronouns(self,mode="text"):
+        """Returns number of pronouns in a text"""
         if "nb_pronouns" in list(self.statistics.keys()):
             if self.statistics["nb_pronouns"] == None:
                 self.statistics["nb_pronouns"] = self.readability_processor.count_pronouns(self.content,mode)
@@ -277,6 +278,7 @@ class ParsedText:
         return self.statistics["nb_pronouns"]
     
     def count_articles(self,mode="text"):
+        """Returns number of articles in a text"""
         if "nb_articles" in list(self.statistics.keys()):
             if self.statistics["nb_articles"] == None:
                 self.statistics["nb_articles"] = self.readability_processor.count_articles(self.content,mode)
@@ -285,6 +287,7 @@ class ParsedText:
         return self.statistics["nb_articles"]
         
     def count_proper_nouns(self,mode="text"):
+        """Returns number of proper nouns in a text"""
         if "nb_proper_nouns" in list(self.statistics.keys()):
             if self.statistics["nb_proper_nouns"] == None:
                 self.statistics["nb_proper_nouns"] = self.readability_processor.count_proper_nouns(self.content,mode)
@@ -293,10 +296,39 @@ class ParsedText:
         return self.statistics["nb_proper_nouns"]
 
     def lexical_cohesion_tfidf(self, mode="text", force=False):
+        """
+        Returns the average cosine similarity between adjacent sentences in a text after TFIDF representation.
+
+        This can be done by representing the contents of each sentence in a term frequency-inverse document frequency matrix,
+        and using that to calculate the cosine similarity between each represented sentence.
+
+        By using the 'mode' parameter, can use inflected forms of tokens or their lemmas, possibly filtering the text beforehand
+        in order to keep only nouns, proper names, and pronouns.
+        Valid values for mode are : 'text', 'lemma', 'subgroup_text', 'subgroup_lemma'.
+
+        :param str mode: Whether to filter the text, and whether to use raw texts or lemmas.
+        :return: Average of cosine similarity between each adjacent sentence [i, i+1]
+        :rtype: float
+        """
         return self.call_score("cosine_similarity_tfidf",[mode],force)
 
     # NOTE: this seems to output the same values, whether we use text or lemmas, probably due to the type of model used.
     def lexical_cohesion_LDA(self ,mode="text", force=False):
+        """
+        Returns the average cosine similarity between adjacent sentences in a text by using a Latent Dirichlet allocation.
+
+        This is a step further than the TFIDF method since this instead relates "topics" together instead of simply indicating
+        whether two sentences share some exact words.
+        This is done thanks to GenSim and Word2Vec : By first converting a text's sentences into BOW vectors,
+        then by using the model to see if two adjacent sentences share the same topics.
+        
+        By using the 'mode' parameter, can use inflected forms of tokens or their lemmas.
+        Valid values for mode are : 'text', 'lemma'.
+        
+        :param str mode: Whether to filter the text, and whether to use raw texts or lemmas.
+        :return: Average of cosine similarity between each adjacent sentence [i, i+1]
+        :rtype: float
+        """
         return self.call_score("cosine_similarity_LDA",[mode],force)
 
         

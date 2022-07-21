@@ -1,16 +1,17 @@
 """
 The discourse module contains functions allowing to calculate notions related to text cohesion.
+
 Text cohesion means how parts of a text are related with explicit formal grammatical ties.
-The following features can be measured : co-reference | anaphoric chains, entity density and specific cohesion features (lexical too)
-and POS-tag based cohesion measures.
+The following notions are used: co-reference or anaphoric chains, entity density, POS-tag based cohesion measures.
+Currently, most of these features have been based upon the ones referenced in this paper: 
+https://hal.archives-ouvertes.fr/hal-01430554 [Are Cohesive Features Relevant for Text Readability Evaluation?]
+However, please note that some implementations could be improved, as this is a somewhat recent notion.
 """
-import math
-from ..utils import utils
-from collections import Counter
-import pandas as pd
 import os
-import requests
 import coreferee
+import pandas as pd
+
+from ..utils import utils
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -18,44 +19,9 @@ from gensim.models import KeyedVectors
 from gensim import corpora
 from gensim.matutils import cossim
 
-# Paper by A.Todirascu freely available here in case I need more details : https://hal.archives-ouvertes.fr/hal-01430554/document
-
-# Discourse cohesion features (Martinc):
-# Coherence ~~ is text more than collection of unrelated sentences
-# Cohesion : text represented by explicit formal grammatical ties aka how are parts related to each other
-# Cohesion => co-reference, anaphoric chains, entity density and cohesion features, lexical cohesion measures,
-# and POS tag-based cohesion measures.
-# Clarification : Entity cohesion ~~ relative freq of possible transitions between syntactic functions played by same entity in adjacent sentences
-# Lexical cohesion ~ features like frequency of content word repetition (adjacent), Latent Semantic Analysis for similarity,
-# Lexical Tightness for mean value of Positiv Normalized Pointwise Mutual Information for all pairs of content-word tokens in text
-# POS tag-based is measuring the ratio of pronoun and article parts-of-speech
-
-# Todirascu analyzed 65 discourse features, but found that they don't contribute much compared to traditional or simple formulas,
-# Let's make available the 6 that were significant with semi-partial correlation.
-# Number of pronouns per word | Number of personal pronouns : V except for personal pronouns
-# Average word length of entity : X
-# Object to None : distance between 2 consecutive mentions of same chain is larger than 1 sentence. : X
-# First mention in chain being specific deictic pronoun (deictic = meaning depends on context, "here","next Tuesday","the thing there", etc.) : X
-# I can't figure which one was the 6th best feature.
-
-# Try to implement each value, and their not so significative variant(s) (could be useful, implementable at the same time).
-# Refer to todirascu 4.1 to view
-# Since we'll later implement a semi-partial correlation evaluation.
-
-# Future for chains :
-# https://github.com/boberle/cofr (Seems good but might be hard-ish to implement) (uses BERT-Multilingual as a dependency)
-# https://github.com/explosion/coreferee (doesn't show "obvious" referents, easy to implement but might be a tad hard to extract some features)
-# https://github.com/mehdi-mirzapour/French-CRS (not usable at all, requires end-user to make a virtualenv and jump through hoops)
-
-
-# It might be relevant to include ways to test the importance of these features for users of this lib, maybe just provide multiple linear regression
-# and semi-partial correlation at the same time.
-
-# found this guy talking about coreference chains https://boberle.com/fr/projects/coreference-chains-in-research-articles/
-# read this to understand how stuff works https://aclanthology.org/P19-1066.pdf Coreference Resolution with Entity Equalization
-
-spacy_pronoun_tags = ["PRON", "PRP", "PRP$", "WP", "WP$", "PDAT", "PDS", "PIAT", "PIDAT", "PIS", "PPER", "PPOSAT", "PPOSS", "PRELAT", "PRELS", "PRF", "PWAT", "PWAV", "PWS", "PN"]
 DATA_ENTRY_POINT = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'data'))
+spacy_pronoun_tags = ["PRON", "PRP", "PRP$", "WP", "WP$", "PDAT", "PDS", "PIAT", "PIDAT", "PIS", "PPER", "PPOSAT", "PPOSS", "PRELAT", "PRELS", "PRF", "PWAT", "PWAV", "PWS", "PN"]
+
 
 # Pos-tag based features : 
 def nb_pronouns(text, nlp = None, mode="text"):
@@ -77,14 +43,6 @@ def nb_proper_nouns(text, nlp=None, mode="text"):
         return [token.text for token in nlp(doc) if (token.pos_ == "PROPN")]
     return utils.count_occurences_in_document(text, spacy_filter, nlp, mode)
 
-# lexical cohesion measure = average cosine similarity between adjacent sentences in ONE document :
-# Use TF-IDF : (words | lemma | sub(nouns, proper names, pronouns)-words | sub-lemmas)
-# Use LDA as LSA equivalent : 
-# get pre-trained model(s)/data here https://fauconnier.github.io/#data
-# func exemple here https://stackoverflow.com/questions/22129943/how-to-calculate-the-sentence-similarity-using-word2vec-model-of-gensim-with-pyt
-# gensim/lda/cosine tutorials : https://github.com/nicolashernandez/teaching_nlp/blob/main/M2-CN-2021-22_03_repr%C3%A9sentation_des_textes_sac_de_mots.ipynb
-# https://github.com/nicolashernandez/teaching_nlp/blob/main/M2-CN-2021-22_04_repr%C3%A9sentation_vectorielle_continue.ipynb
-
 # Measures related to lexical cohesion :
 def average_cosine_similarity_tfidf(text, nlp = None, mode="text"):
     """
@@ -92,7 +50,6 @@ def average_cosine_similarity_tfidf(text, nlp = None, mode="text"):
 
     This can be done by representing the contents of each sentence in a term frequency-inverse document frequency matrix,
     and using that to calculate the cosine similarity between each represented sentence.
-
     By using the 'mode' parameter, can use inflected forms of tokens or their lemmas, possibly filtering the text beforehand
     in order to keep only nouns, proper names, and pronouns.
     Valid values for mode are : 'text', 'lemma', 'subgroup_text', 'subgroup_lemma'.
@@ -213,7 +170,7 @@ def entity_density(text,nlp=None,unique=False):
             counter += len(chain)
         return counter / len(text)
 
-def proportion_referring_entity(text,nlp=None):
+def referring_entity_ratio(text,nlp=None):
     """Returns amount of anaphoric mentions in text : Mentions of an entity except for the entity itself."""
     doc = utils.convert_text_to_string(text)
     doc = nlp(doc)
@@ -230,7 +187,6 @@ def proportion_referring_entity(text,nlp=None):
 # However this won't work for not-named entities that are composite, like "cette femme".
 def average_entity_word_length(text,nlp=None):
     """Returns average word length of each entity."""
-
     doc = utils.convert_text_to_string(text)
     counter = 0
     entity_dict = dict()
@@ -254,7 +210,6 @@ def average_entity_word_length(text,nlp=None):
     return counter / len(text) 
 
 # Co-reference chain properties.
-
 def average_length_reference_chain(text, nlp=None):
     """Counts number of mentions appearing in coreference chains, and returns the average."""
     doc = utils.convert_text_to_string(text)
@@ -330,7 +285,24 @@ def spacy_filter_coreference_count(doc, nlp, mention_index, mention_type, noun_g
         return -1
 
 def count_type_mention(text, mention_type=None, nlp=None):
-    #ok so for each mention get the corresponding spacy thing and see what it is. hopefully it'll all be accounted for but we'll have to go one by one:
+    """
+    Returns the ratio of a specific type of mention in a text per coreference chain.
+
+    As of now, the recognized mention types are :
+        * indefinite_NP
+        * definite_NP
+        * NP_without_determiner
+        * possessive_determiner
+        * demonstrative_determiner
+        * proper_name
+        * reflexive_pronoun
+        * relative_pronoun
+        * demonstrative_pronoun
+
+    :param str mention_type: Denotes the type of mention to be recognized. 
+    :return: Amount of times a specific type of mention appears in a text, divided by the number of coreference chains.
+    :rtype: float
+    """
     doc = utils.convert_text_to_string(text)
     doc = nlp(doc)
     counter = 0
@@ -345,11 +317,30 @@ def count_type_mention(text, mention_type=None, nlp=None):
     for chain in doc._.coref_chains:
         for mention in chain:
             for index in mention.token_indexes:
+                # Increment counter if mention type to check is the same as mention's type thanks to spacy filter
                 counter += spacy_filter_coreference_count(doc, nlp, index, mention_type, noun_phrases_info)
     counter = counter / len(doc._.coref_chains) # Average over number of chains
     return counter
 
 def count_type_opening(text, mention_type=None, nlp=None):
+    """
+    Returns the ratio of a specific type of mention in a text for the first mention, which usually introduces the entity, per coreference chain.
+
+    As of now, the recognized mention types are :
+        * indefinite_NP
+        * definite_NP
+        * NP_without_determiner
+        * possessive_determiner
+        * demonstrative_determiner
+        * proper_name
+        * reflexive_pronoun
+        * relative_pronoun
+        * demonstrative_pronoun
+
+    :param str mention_type: Denotes the type of mention to be recognized. 
+    :return: Amount of times a specific type of mention appears in a text, divided by the number of coreference chains.
+    :rtype: float
+    """
     doc = utils.convert_text_to_string(text)
     doc = nlp(doc)
     counter = 0
@@ -363,16 +354,15 @@ def count_type_opening(text, mention_type=None, nlp=None):
     # For the first mention of each entity, get the index via mention.token_indexes. It's a complex mention if nb token_indexes > 1
     for chain in doc._.coref_chains:
         for index in chain[0].token_indexes:
+            # Increment counter if mention type to check is the same as mention's type thanks to spacy filter
             counter += spacy_filter_coreference_count(doc, nlp, index, mention_type, noun_phrases_info)
     counter = counter / len(doc._.coref_chains) # Average over number of chains
     return counter
 
 
-def stub_lexical_cohesion(text,nlp=None):
-    """
-    # Lexical cohesion ~ features like frequency of content word repetition (adjacent), Latent Semantic Analysis for similarity,
-    # Lexical Tightness for mean value of Positiv Normalized Pointwise Mutual Information for all pairs of content-word tokens in text
-    """
+def stub_lexical_tightness(text,nlp=None):
+    """Not implemented yet, research is needed to understand what lexical tightness is, and how to evaluate it."""
+    #TODO : Research what is lexical tightness, and how to evaluate it.
     return 0
 
 # The following features were significant in Todirascu's paper but I don't quite know what they are.
@@ -392,4 +382,5 @@ def distance_object_to_none(text,nlp = None):
 
 # TODO: figure out how to recognize deictic words.
 def first_chain_is_deictic(text,nlp=None):
+    """Not implemented yet, need to figure out how to recognize deictic words."""
     return 0
