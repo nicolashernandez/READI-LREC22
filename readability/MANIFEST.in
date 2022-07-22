@@ -1,3 +1,0 @@
-include readability/data/*
-include readability/data/word_list/*
-include readability/data/lexique/*
