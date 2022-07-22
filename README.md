@@ -44,7 +44,7 @@ Next, the `parsed_text` and `parsed_collection` folders contain the specificatio
 Finally, the `utils` folder contains diverse helper functions that can be used by most of the other submodules. It also contains a configuration of the external resources : How to acquire them, and what to extract from them.
 
 ## Using the library:
-As mentioned before, the library constitues of two main components: the *ReadabilityProcessor*, and the *ParsedText* or *ParsedCollection* classes.
+As mentioned before, the library constitues of two main components: the *ReadabilityProcessor*, and the *ParsedText* or *ParsedCollection* classes.  
 First, the ReadabilityProcessor is created, and loads several external resources, cached locally or via the internet, which enables the several functions and implementations of readability estimation available.  
 Then, the *ParsedText* or *ParsedCollection* instance should be created, in order to speed up the process via sharing information inside the *ReadabilityProcessor*, and to be able to quickly get the calculated measures wanted.
 
@@ -57,5 +57,30 @@ Then, the *ParsedText* or *ParsedCollection* instance should be created, in orde
     parsed_corpus = readability_processor.parseCollection(example_corpus)
     parsed_corpus.show_scores(force=True)
 
-## Sources:
-TODO
+## References:
+
+### External resources:
+
+#### Main NLP processor:
+
+spacy [https://spacy.io/](https://spacy.io/)  
+Coreferee pipeline plugin for coreference resolution [https://spacy.io/universe/project/coreferee](https://spacy.io/universe/project/coreferee)
+
+#### Word lists:
+
+Dubois-Buyse [https://www.charivarialecole.fr/archives/1847](https://www.charivarialecole.fr/archives/1847)  
+Lexique database licence **[CC BY SA 4.0]** webpage [http://www.lexique.org/](http://www.lexique.org/)
+
+#### Language models:
+
+GPT2 model (used for perplexity) [https://huggingface.co/asi/gpt-fr-cased-small](https://huggingface.co/asi/gpt-fr-cased-small)  
+French word2vec model by Jean-Philippe Fauconnier [https://fauconnier.github.io/#data](https://fauconnier.github.io/#data)  
+fasttext [https://fasttext.cc/](https://fasttext.cc/)  
+BERT description: [https://arxiv.org/abs/1810.04805](https://arxiv.org/abs/1810.04805)  
+BERT model source:[https://huggingface.co/docs/transformers/model_doc/bert](https://huggingface.co/docs/transformers/model_doc/bert)
+
+### Source of implementations:
+For text diversity, text token ratio had been mentioned in this paper: [ A large-scaled corpus for assessing text readability](https://link.springer.com/article/10.3758/s13428-022-01802-x)  
+Text cohesion features were describe in this paper, although implementations are entirely original: [Are Cohesive Features Relevant for Text Readability Evaluation?](https://hal.archives-ouvertes.fr/hal-01430554)  
+Details regarding pseudo-perplexity came from this paper: [Masked Language Model Scoring](https://doi.org/10.48550/arXiv.1910.14659)  
+The Orthographic Levenshtein Distance 20 had been described in the paper(INVESTIGATING READABILITY OF FRENCH AS A FOREIGN LANGUAGE WITH DEEP LEARNING AND COGNITIVE AND PEDAGOGICAL FEATURES) by Kevin Yancey, Alice Pintard, and Thomas François. It will be available here after the embargo period is lifted [https://dial.uclouvain.be/pr/boreal/fr/object/boreal%3A255445/datastreams](https://dial.uclouvain.be/pr/boreal/fr/object/boreal%3A255445/datastreams)

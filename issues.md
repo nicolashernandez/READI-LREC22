@@ -46,6 +46,10 @@ This function is supposed to generate a corpus, which can then be parsed into a 
 
 The current function is a poor estimator of the number of syllables in a word, as it only counts the number of vowels. An improvement has been proposed by only counting vowels that are not preceded by another vowel, but that is still not accurate enough to warrant a change.
 
+> 📝 **TODO:** Add BERT and fasttext to the dependency system.
+
+As of July 22, the models are loaded from within the `models` submodule which could potentially cause weird behavior.
+
 
 ## In stats/common_scores.py:
 > ⚠️ **FIXME:** Several formulas are incorrect.
